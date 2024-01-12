@@ -47,7 +47,7 @@ jobs:
         which migrate
 
     - name: Run migrations
-      run: make migrateup
+      run: migrate -path ./db/migration -database "postgresql://${{secrets.POSTGRES_USER}}:${{secrets.POSTGRES_PASSWORD}}@localhost:5432/${{secrets.POSTGRES_DB}}?sslmode=disable" -verbose up
 
     - name: Test
-      run: make test
+      run: go test -v -cover ./...

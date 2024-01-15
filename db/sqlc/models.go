@@ -9,11 +9,15 @@ import (
 )
 
 type Account struct {
-	ID        int64     `json:"id"`
-	Owner     string    `json:"owner"`
-	Balance   int64     `json:"balance"`
-	Currency  string    `json:"currency"`
-	CreatedAt time.Time `json:"created_at"`
+	ID            int64     `json:"id"`
+	AccountName   string    `json:"account_name"`
+	AccountNumber int64     `json:"account_number"`
+	PhoneNumber   int64     `json:"phone_number"`
+	Email         string    `json:"email"`
+	Status        string    `json:"status"`
+	Balance       int64     `json:"balance"`
+	CurrencyCode  string    `json:"currency_code"`
+	CreatedAt     time.Time `json:"created_at"`
 }
 
 type Entry struct {

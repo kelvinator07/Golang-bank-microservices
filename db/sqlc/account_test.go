@@ -12,17 +12,21 @@ import (
 
 func createRandomAccount(t *testing.T) Account {
 	arg := CreateAccountParams{
-		Owner: util.RandomOwner(),
-		Balance: util.RandomMoney(),
-		Currency: util.RandomCurrency(),
+		AccountName:   util.RandomAccountName(),
+		AccountNumber: util.RandomAccountNumber(),
+		PhoneNumber:   util.RandomPhoneNumber(),
+		Email:         util.RandomEmail(),
+		Status:        util.RandomStatus(),
+		Balance:       util.RandomMoney(),
+		CurrencyCode:  util.RandomCurrency(),
 	}
 
 	account, err := testQueries.CreateAccount(context.Background(), arg)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, account)
-	assert.Equal(t, arg.Owner, account.Owner)
+	assert.Equal(t, arg.AccountName, account.AccountName)
 	assert.Equal(t, arg.Balance, account.Balance)
-	assert.Equal(t, arg.Currency, account.Currency)
+	assert.Equal(t, arg.CurrencyCode, account.CurrencyCode)
 
 	assert.NotZero(t, account.ID)
 	assert.NotZero(t, account.CreatedAt)
@@ -42,9 +46,9 @@ func TestGetAccount(t *testing.T) {
 	assert.NotEmpty(t, expectedAccount)
 
 	assert.Equal(t, testAccount.ID, expectedAccount.ID)
-	assert.Equal(t, testAccount.Owner, expectedAccount.Owner)
+	assert.Equal(t, testAccount.AccountName, expectedAccount.AccountName)
 	assert.Equal(t, testAccount.Balance, expectedAccount.Balance)
-	assert.Equal(t, testAccount.Currency, expectedAccount.Currency)
+	assert.Equal(t, testAccount.CurrencyCode, expectedAccount.CurrencyCode)
 	assert.WithinDuration(t, testAccount.CreatedAt, expectedAccount.CreatedAt, time.Second)
 }
 
@@ -52,7 +56,7 @@ func TestUpdateAccount(t *testing.T) {
 	testAccount := createRandomAccount(t)
 
 	arg := UpdateAccountParams{
-		ID: testAccount.ID,
+		ID:      testAccount.ID,
 		Balance: util.RandomMoney(),
 	}
 
@@ -61,9 +65,9 @@ func TestUpdateAccount(t *testing.T) {
 	assert.NotEmpty(t, expectedAccount)
 
 	assert.Equal(t, testAccount.ID, expectedAccount.ID)
-	assert.Equal(t, testAccount.Owner, expectedAccount.Owner)
+	assert.Equal(t, testAccount.AccountName, expectedAccount.AccountName)
 	assert.Equal(t, arg.Balance, expectedAccount.Balance)
-	assert.Equal(t, testAccount.Currency, expectedAccount.Currency)
+	assert.Equal(t, testAccount.CurrencyCode, expectedAccount.CurrencyCode)
 	assert.WithinDuration(t, testAccount.CreatedAt, expectedAccount.CreatedAt, time.Second)
 }
 
@@ -83,7 +87,7 @@ func TestListAccount(t *testing.T) {
 		createRandomAccount(t)
 	}
 	arg := ListAccountsParams{
-		Limit: 5,
+		Limit:  5,
 		Offset: 5,
 	}
 

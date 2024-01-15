@@ -1,10 +1,14 @@
 -- name: CreateAccount :one
 INSERT INTO accounts (
-  owner,
+  account_name,
+  account_number,
+  phone_number,
+  email,
+  status,
   balance,
-  currency
+  currency_code
 ) VALUES (
-  $1, $2, $3
+  $1, $2, $3, $4, $5, $6, $7
 ) RETURNING *;
 
 -- name: GetAccount :one

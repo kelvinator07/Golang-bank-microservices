@@ -1,19 +1,24 @@
 package util
 
 import (
+	"fmt"
 	"math/rand"
+	"strconv"
 	"strings"
 	"time"
 )
 
-const alphabet = "abcdefghijklmnopqrstuvwxyz"
+const (
+	alphabet = "abcdefghijklmnopqrstuvwxyz"
+	numbers  = "0123456789"
+)
 
 func init() {
 	rand.New(rand.NewSource(time.Now().UnixNano()))
 }
 
 func RandomInt(min, max int64) int64 {
-	return min + rand.Int63n(max - min + 1)
+	return min + rand.Int63n(max-min+1)
 }
 
 func RandomString(n int) string {
@@ -28,8 +33,16 @@ func RandomString(n int) string {
 	return sb.String()
 }
 
-// RandomOwner generates a random owner name
-func RandomOwner() string {
+func stringWithCharset(length int, charset string) string {
+	b := make([]byte, length)
+	for i := range b {
+		b[i] = charset[rand.Intn(len(charset))]
+	}
+	return string(b)
+}
+
+// RandomAccountName generates a random owner name
+func RandomAccountName() string {
 	return RandomString(6)
 }
 
@@ -40,8 +53,28 @@ func RandomMoney() int64 {
 
 // RandomCurrency generates a random currency code
 func RandomCurrency() string {
-	currencies := []string{"USD", "EUR", "NGN"}
+	currencies := []string{"USD", "NGN"}
 	n := len(currencies)
 	return currencies[rand.Intn(n)]
 }
 
+func RandomPhoneNumber() int64 {
+	v, _ := strconv.Atoi(stringWithCharset(11, numbers))
+	return int64(v)
+}
+
+func RandomAccountNumber() int64 {
+	v, _ := strconv.Atoi(stringWithCharset(10, numbers))
+	return int64(v)
+}
+
+func RandomEmail() string {
+	return fmt.Sprintf("%v@email.com", RandomString(6))
+}
+
+// RandomStatus generates a random account status: active or inactive
+func RandomStatus() string {
+	statuses := []string{"active", "inactive"}
+	n := len(statuses)
+	return statuses[rand.Intn(n)]
+}

@@ -18,7 +18,16 @@ migratedown:
 sqlc:
 	sqlc generate
 
+format-check:
+	gofmt -l .
+
+format-lint:
+	gofmt -s -w .
+
 test:
 	go test -v -cover ./...
+
+server:
+	go run main.go
  
-.PHONY: potgres createdb dropdb migrateup migratedown sqlc test
+.PHONY: potgres createdb dropdb migrateup migratedown sqlc test server

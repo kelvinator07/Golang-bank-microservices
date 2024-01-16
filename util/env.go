@@ -6,32 +6,30 @@ import (
 	"github.com/spf13/viper"
 )
 
+type Env struct {
+	DBDriver         string `mapstructure:"DB_DRIVER"`
+	DBSource         string `mapstructure:"DB_SOURCE"`
+	ServerAddress    string `mapstructure:"SERVER_ADDRESS"`
+	PostgresUser     string `mapstructure:"POSTGRES_USER"`
+	PostgresPassword string `mapstructure:"POSTGRES_PASSWORD"`
+	PostgresDatabase string `mapstructure:"POSTGRES_DATABASE"`
+}
+
 // use viper package to read .env file
 // return the value of the key
-func ViperEnvVariable(key string) string {
-	// SetConfigFile explicitly defines the path, name and extension of the config file.
-	// Viper will use this and not check any of the config paths.
-	// .env - It will search for the .env file in the current directory
-	viper.SetConfigFile(".env")
+func LoadConfig(path string) (envConfig Env, err error) {
+	// viper.AddConfigPath(path)
+	// viper.SetConfigName("app")
+	// viper.SetConfigType("env")
+	viper.SetConfigFile(path)
 
-	// Find and read the config file
-	err := viper.ReadInConfig()
+	viper.AutomaticEnv()
 
+	// Read the config file
+	err = viper.ReadInConfig()
 	if err != nil {
 		log.Fatalf("Error while reading config file %s", err)
 	}
-
-	// viper.Get() returns an empty interface{}
-	// to get the underlying type of the key,
-	// we have to do the type assertion, we know the underlying value is string
-	// if we type assert to other type it will throw an error
-	value, ok := viper.Get(key).(string)
-
-	// If the type is a string then ok will be true
-	// ok will make sure the program not break
-	if !ok {
-		log.Fatalf("Invalid type assertion")
-	}
-
-	return value
+	err = viper.Unmarshal(&envConfig)
+	return
 }

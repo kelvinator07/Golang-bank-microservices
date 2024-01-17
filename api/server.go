@@ -60,3 +60,10 @@ func validResponse[T any](t T) gin.H {
 	fmt.Println("T val ", val)
 	return gin.H{"result": val}
 }
+
+func validResponse2(t db.TransferTxResult) *HttpResponse[db.TransferTxResult] {
+	fmt.Println("T ", t)
+	val := &HttpResponse[db.TransferTxResult]{"00", "Success", t}
+	fmt.Println("T val ", val)
+	return val
+}

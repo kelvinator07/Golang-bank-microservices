@@ -78,3 +78,10 @@ func RandomStatus() string {
 	n := len(statuses)
 	return statuses[rand.Intn(n)]
 }
+
+// RandomGender generates a random gender
+func RandomGender() string {
+	genders := []string{"MALE", "FEMALE"}
+	n := len(genders)
+	return genders[rand.Intn(n)]
+}

@@ -47,7 +47,10 @@ func (server *Server) createTransfer(ctx *gin.Context) {
 		return
 	}
 
+	fmt.Printf("Type of variable1: %T\n", result)
+	fmt.Printf("Type of variable2: %T\n", NewHttpResponse("00", "status", result))
 	ctx.JSON(http.StatusOK, result)
+	// ctx.JSON(http.StatusOK, *NewHttpResponse("00", "status", result))
 	// TODO: Generics
 	// ctx.JSON(http.StatusOK, *NewHttpResponse{"status", "message", "data"})
 }

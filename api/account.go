@@ -10,9 +10,7 @@ import (
 )
 
 type createAccountRequest struct {
-	AccountName  string `json:"account_name" binding:"required"`
-	PhoneNumber  int64  `json:"phone_number" binding:"required,number"`
-	Email        string `json:"email" binding:"required,email"`
+	UserID       int64  `json:"user_id" binding:"required,min=1"`
 	CurrencyCode string `json:"currency_code" binding:"required,currencyCode"`
 }
 
@@ -23,11 +21,10 @@ func (server *Server) createAccount(ctx *gin.Context) {
 		return
 	}
 
+	// Get user ID from request
 	arg := db.CreateAccountParams{
-		AccountName:   req.AccountName,
+		UserID:        req.UserID,
 		AccountNumber: util.RandomAccountNumber(),
-		PhoneNumber:   req.PhoneNumber,
-		Email:         req.Email,
 		Status:        "inactive",
 		Balance:       0,
 		CurrencyCode:  req.CurrencyCode,

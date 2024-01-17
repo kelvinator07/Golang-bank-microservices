@@ -74,16 +74,18 @@ func (store *SQLStore) TransferTx(ctx context.Context, arg TransferTxParams) (Tr
 		}
 
 		result.FromEntry, err = q.CreateEntry(ctx, CreateEntryParams{
-			AccountID: arg.FromAccountID,
-			Amount:    -arg.Amount,
+			AccountID:   arg.FromAccountID,
+			Amount:      -arg.Amount,
+			DebitCredit: "debit",
 		})
 		if err != nil {
 			return err
 		}
 
 		result.ToEntry, err = q.CreateEntry(ctx, CreateEntryParams{
-			AccountID: arg.ToAccountID,
-			Amount:    arg.Amount,
+			AccountID:   arg.ToAccountID,
+			Amount:      arg.Amount,
+			DebitCredit: "credit",
 		})
 		if err != nil {
 			return err

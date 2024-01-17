@@ -10,12 +10,13 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// create users, then use user id to create aacount
 func createRandomAccount(t *testing.T) Account {
+	user := createRandomUser(t)
+
 	arg := CreateAccountParams{
-		AccountName:   util.RandomAccountName(),
+		UserID:        user.ID,
 		AccountNumber: util.RandomAccountNumber(),
-		PhoneNumber:   util.RandomPhoneNumber(),
-		Email:         util.RandomEmail(),
 		Status:        util.RandomStatus(),
 		Balance:       util.RandomMoney(),
 		CurrencyCode:  util.RandomCurrency(),
@@ -24,7 +25,6 @@ func createRandomAccount(t *testing.T) Account {
 	account, err := testQueries.CreateAccount(context.Background(), arg)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, account)
-	assert.Equal(t, arg.AccountName, account.AccountName)
 	assert.Equal(t, arg.Balance, account.Balance)
 	assert.Equal(t, arg.CurrencyCode, account.CurrencyCode)
 
@@ -36,7 +36,6 @@ func createRandomAccount(t *testing.T) Account {
 
 func TestCreateAccount(t *testing.T) {
 	createRandomAccount(t)
-
 }
 
 func TestGetAccount(t *testing.T) {
@@ -46,7 +45,6 @@ func TestGetAccount(t *testing.T) {
 	assert.NotEmpty(t, expectedAccount)
 
 	assert.Equal(t, testAccount.ID, expectedAccount.ID)
-	assert.Equal(t, testAccount.AccountName, expectedAccount.AccountName)
 	assert.Equal(t, testAccount.Balance, expectedAccount.Balance)
 	assert.Equal(t, testAccount.CurrencyCode, expectedAccount.CurrencyCode)
 	assert.WithinDuration(t, testAccount.CreatedAt, expectedAccount.CreatedAt, time.Second)
@@ -65,7 +63,6 @@ func TestUpdateAccount(t *testing.T) {
 	assert.NotEmpty(t, expectedAccount)
 
 	assert.Equal(t, testAccount.ID, expectedAccount.ID)
-	assert.Equal(t, testAccount.AccountName, expectedAccount.AccountName)
 	assert.Equal(t, arg.Balance, expectedAccount.Balance)
 	assert.Equal(t, testAccount.CurrencyCode, expectedAccount.CurrencyCode)
 	assert.WithinDuration(t, testAccount.CreatedAt, expectedAccount.CreatedAt, time.Second)

@@ -10,10 +10,8 @@ import (
 
 type Account struct {
 	ID            int64     `json:"id"`
-	AccountName   string    `json:"account_name"`
+	UserID        int64     `json:"user_id"`
 	AccountNumber int64     `json:"account_number"`
-	PhoneNumber   int64     `json:"phone_number"`
-	Email         string    `json:"email"`
 	Status        string    `json:"status"`
 	Balance       int64     `json:"balance"`
 	CurrencyCode  string    `json:"currency_code"`
@@ -24,8 +22,9 @@ type Entry struct {
 	ID        int64 `json:"id"`
 	AccountID int64 `json:"account_id"`
 	// can be negative or positive
-	Amount    int64     `json:"amount"`
-	CreatedAt time.Time `json:"created_at"`
+	Amount      int64     `json:"amount"`
+	DebitCredit string    `json:"debit_credit"`
+	CreatedAt   time.Time `json:"created_at"`
 }
 
 type Transfer struct {
@@ -35,4 +34,16 @@ type Transfer struct {
 	// must be positive
 	Amount    int64     `json:"amount"`
 	CreatedAt time.Time `json:"created_at"`
+}
+
+type User struct {
+	ID                int64     `json:"id"`
+	AccountName       string    `json:"account_name"`
+	HashedPassword    string    `json:"hashed_password"`
+	Address           string    `json:"address"`
+	Gender            string    `json:"gender"`
+	PhoneNumber       int64     `json:"phone_number"`
+	Email             string    `json:"email"`
+	PasswordChangedAt time.Time `json:"password_changed_at"`
+	CreatedAt         time.Time `json:"created_at"`
 }

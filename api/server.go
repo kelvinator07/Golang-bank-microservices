@@ -1,12 +1,17 @@
 package api
 
 import (
-	"fmt"
-
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 	"github.com/go-playground/validator/v10"
 	db "github.com/kelvinator07/golang-bank-microservices/db/sqlc"
+)
+
+const (
+	SuccessStatusCode    string = "00"
+	FailedStatusCode     string = "99"
+	SuccessStatusMessage string = "Success"
+	FailedStatusMessage  string = "Failed"
 )
 
 type Server struct {
@@ -32,6 +37,10 @@ func NewServer(store db.Store) *Server {
 
 	router.POST("/api/v1/transfers", server.createTransfer)
 
+	router.POST("/api/v1/users", server.createUser)
+	router.GET("/api/v1/users/:id", server.getOneUser)
+	router.GET("/api/v1/users", server.getAllUsers)
+
 	server.router = router
 	return server
 }
@@ -41,29 +50,27 @@ func (server *Server) Start(serverAddress string) error {
 }
 
 func errorResponse(err error) gin.H {
-	return gin.H{"error": err.Error()}
+	return gin.H{
+		"status":  FailedStatusCode,
+		"message": FailedStatusMessage,
+		"error":   err.Error(),
+	}
 }
 
-type HttpResponse[T any] struct {
+type HttpResponse struct {
 	status  string `json:"status"`
 	message string `json:"message"`
-	data    T      `json:"data"`
+	data    any    `json:"data"`
 }
 
-func NewHttpResponse[T any](status string, message string, d T) *HttpResponse[any] {
-	return &HttpResponse[any]{status, message, d}
+func NewHttpResponse(status string, message string, data any) *HttpResponse {
+	return &HttpResponse{status, message, data}
 }
 
-func validResponse[T any](t T) gin.H {
-	fmt.Println("T ", t)
-	val := &HttpResponse[T]{"00", "Success", t}
-	fmt.Println("T val ", val)
-	return gin.H{"result": val}
-}
-
-func validResponse2(t db.TransferTxResult) *HttpResponse[db.TransferTxResult] {
-	fmt.Println("T ", t)
-	val := &HttpResponse[db.TransferTxResult]{"00", "Success", t}
-	fmt.Println("T val ", val)
-	return val
+func validResponse(d any) gin.H {
+	return gin.H{
+		"status":  SuccessStatusCode,
+		"data":    d,
+		"message": SuccessStatusMessage,
+	}
 }

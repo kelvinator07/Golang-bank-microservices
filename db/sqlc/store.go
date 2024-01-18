@@ -6,6 +6,11 @@ import (
 	"fmt"
 )
 
+const (
+	debit  string = "debit"
+	credit string = "credit"
+)
+
 type Store interface {
 	Querier
 	TransferTx(ctx context.Context, arg TransferTxParams) (TransferTxResult, error)
@@ -76,7 +81,7 @@ func (store *SQLStore) TransferTx(ctx context.Context, arg TransferTxParams) (Tr
 		result.FromEntry, err = q.CreateEntry(ctx, CreateEntryParams{
 			AccountID:   arg.FromAccountID,
 			Amount:      -arg.Amount,
-			DebitCredit: "debit",
+			DebitCredit: debit,
 		})
 		if err != nil {
 			return err
@@ -85,7 +90,7 @@ func (store *SQLStore) TransferTx(ctx context.Context, arg TransferTxParams) (Tr
 		result.ToEntry, err = q.CreateEntry(ctx, CreateEntryParams{
 			AccountID:   arg.ToAccountID,
 			Amount:      arg.Amount,
-			DebitCredit: "credit",
+			DebitCredit: credit,
 		})
 		if err != nil {
 			return err

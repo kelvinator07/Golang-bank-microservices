@@ -9,6 +9,11 @@ import (
 	"github.com/kelvinator07/golang-bank-microservices/util"
 )
 
+const (
+	active   string = "active"
+	inactive string = "inactive"
+)
+
 type createAccountRequest struct {
 	UserID       int64  `json:"user_id" binding:"required,min=1"`
 	CurrencyCode string `json:"currency_code" binding:"required,currencyCode"`
@@ -25,7 +30,7 @@ func (server *Server) createAccount(ctx *gin.Context) {
 	arg := db.CreateAccountParams{
 		UserID:        req.UserID,
 		AccountNumber: util.RandomAccountNumber(),
-		Status:        "inactive",
+		Status:        inactive,
 		Balance:       0,
 		CurrencyCode:  req.CurrencyCode,
 	}

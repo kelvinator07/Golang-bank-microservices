@@ -14,9 +14,12 @@ func TestCreateUser(t *testing.T) {
 
 // create users, then use user id to create aacount
 func createRandomUser(t *testing.T) User {
+	hashedPassword, err := util.HashPassword(util.RandomString(6))
+	assert.NoError(t, err)
+
 	arg := CreateUserParams{
 		AccountName:    util.RandomString(10),
-		HashedPassword: util.RandomString(10),
+		HashedPassword: hashedPassword,
 		Address:        util.RandomString(20),
 		Gender:         util.RandomGender(),
 		PhoneNumber:    util.RandomPhoneNumber(),

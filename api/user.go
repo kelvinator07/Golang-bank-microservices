@@ -2,10 +2,14 @@ package api
 
 import (
 	"database/sql"
+	"errors"
+	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	db "github.com/kelvinator07/golang-bank-microservices/db/sqlc"
+	"github.com/kelvinator07/golang-bank-microservices/token"
 	"github.com/kelvinator07/golang-bank-microservices/util"
 	"github.com/lib/pq"
 )
@@ -77,6 +81,57 @@ func (server *Server) createUser(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, validResponse(res))
 }
 
+type loginUserRequest struct {
+	Email    string `json:"email" binding:"required,email"`
+	Password string `json:"password" binding:"required,min=6"`
+}
+
+type loginUserResponse struct {
+	AccessToken           string    `json:"access_token"`
+	AccessTokenExpiresAt  time.Time `json:"access_token_expires_at"`
+	RefreshToken          string    `json:"refresh_token"`
+	RefreshTokenExpiresAt time.Time `json:"refresh_token_expires_at"`
+}
+
+func (server *Server) loginUser(ctx *gin.Context) {
+	var req loginUserRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		ctx.JSON(http.StatusBadRequest, errorResponse(err))
+		return
+	}
+
+	user, err := server.store.GetUserByEmail(ctx, req.Email)
+	if err != nil {
+		// if errors.Is(err, db.ErrRecordNotFound) {
+		// 	err = fmt.Errorf("user with email %s doesn't exist", req.Email)
+		// 	ctx.JSON(http.StatusNotFound, errorResponse(err))
+		// 	return
+		// }
+		err = fmt.Errorf("user with email %s doesn't exist", req.Email)
+		ctx.JSON(http.StatusNotFound, errorResponse(err))
+		return
+	}
+
+	err = util.ComparePasswords(req.Password, user.HashedPassword)
+	if err != nil {
+		err = errors.New("email and password doesn't match")
+		ctx.JSON(http.StatusBadRequest, errorResponse(err))
+		return
+	}
+
+	token, err := server.tokenMaker.CreateToken(user.ID, user.AccountName, user.Email, time.Hour)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
+		return
+	}
+
+	res := loginUserResponse{
+		AccessToken: token,
+	}
+
+	ctx.JSON(http.StatusOK, validResponse(res))
+}
+
 type getUserRequest struct {
 	ID int64 `uri:"id" binding:"required,min=1"`
 }
@@ -91,11 +146,19 @@ func (server *Server) getOneUser(ctx *gin.Context) {
 	user, err := server.store.GetUser(ctx, req.ID)
 	if err != nil {
 		if err == sql.ErrNoRows {
+			err = fmt.Errorf("user with id %v doesn't exist", req.ID)
 			ctx.JSON(http.StatusNotFound, errorResponse(err))
 			return
 		}
 
 		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
+		return
+	}
+
+	authPayload := ctx.MustGet(authorizationPayloadKey).(*token.Payload)
+	if user.ID != authPayload.UserID {
+		err := errors.New("account doesnt belong to the authenticated user")
+		ctx.JSON(http.StatusUnauthorized, errorResponse(err))
 		return
 	}
 

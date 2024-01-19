@@ -2,11 +2,13 @@ package api
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 	db "github.com/kelvinator07/golang-bank-microservices/db/sqlc"
+	"github.com/kelvinator07/golang-bank-microservices/token"
 )
 
 type transferRequest struct {
@@ -23,15 +25,25 @@ func (server *Server) createTransfer(ctx *gin.Context) {
 		return
 	}
 
-	if !server.validAccount(ctx, req.FromAccountID, req.CurrencyCode) {
+	fromAccount, valid := server.validAccount(ctx, req.FromAccountID, req.CurrencyCode)
+	if !valid {
 		return
 	}
 
-	if !server.validAccountBalance(ctx, req.FromAccountID, req.Amount) {
+	authPayload := ctx.MustGet(authorizationPayloadKey).(*token.Payload)
+	if fromAccount.UserID != authPayload.UserID {
+		err := errors.New("from account doesnt belong to the authenticated user")
+		ctx.JSON(http.StatusUnauthorized, errorResponse(err))
 		return
 	}
 
-	if !server.validAccount(ctx, req.ToAccountID, req.CurrencyCode) {
+	_, valid = server.validAccountBalance(ctx, req.FromAccountID, req.Amount)
+	if !valid {
+		return
+	}
+
+	_, valid = server.validAccount(ctx, req.ToAccountID, req.CurrencyCode)
+	if !valid {
 		return
 	}
 
@@ -47,48 +59,44 @@ func (server *Server) createTransfer(ctx *gin.Context) {
 		return
 	}
 
-	fmt.Printf("Type of variable1: %T\n", result)
-	fmt.Printf("Type of variable2: %T\n", NewHttpResponse("00", "status", result))
-	ctx.JSON(http.StatusOK, result)
-	// ctx.JSON(http.StatusOK, *NewHttpResponse("00", "status", result))
-	// TODO: Generics
-	// ctx.JSON(http.StatusOK, *NewHttpResponse{"status", "message", "data"})
+	ctx.JSON(http.StatusOK, validResponse(result))
 }
 
-func (server Server) validAccount(ctx *gin.Context, accountID int64, currencyCode string) bool {
+func (server Server) validAccount(ctx *gin.Context, accountID int64, currencyCode string) (db.Account, bool) {
 	account, err := server.store.GetAccount(ctx, accountID)
 	if err != nil {
 		if err == sql.ErrNoRows {
+			err = fmt.Errorf("account with id %v doesnt exist", accountID)
 			ctx.JSON(http.StatusNotFound, errorResponse(err))
-			return false
+			return account, false
 		}
 		// unexpected error, then return internal server
 		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
-		return false
+		return account, false
 	}
 
 	if account.CurrencyCode != currencyCode {
 		err := fmt.Errorf("account [%d] currency mistmatch: %s vs %s", account.ID, account.CurrencyCode, currencyCode)
 		ctx.JSON(http.StatusBadRequest, errorResponse(err))
-		return false
+		return account, false
 	}
 
-	return true
+	return account, true
 }
 
-func (server Server) validAccountBalance(ctx *gin.Context, accountID int64, amount int64) bool {
+func (server Server) validAccountBalance(ctx *gin.Context, accountID int64, amount int64) (db.Account, bool) {
 	account, err := server.store.GetAccount(ctx, accountID)
 	if err != nil {
 		// unexpected error, then return internal server
 		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
-		return false
+		return account, false
 	}
 
 	if amount > account.Balance {
 		err := fmt.Errorf("account [%d] doesn't have enough balance: %v", account.ID, account.Balance)
 		ctx.JSON(http.StatusBadRequest, errorResponse(err))
-		return false
+		return account, false
 	}
 
-	return true
+	return account, true
 }

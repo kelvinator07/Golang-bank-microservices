@@ -2,10 +2,13 @@ package api
 
 import (
 	"database/sql"
+	"errors"
+	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 	db "github.com/kelvinator07/golang-bank-microservices/db/sqlc"
+	"github.com/kelvinator07/golang-bank-microservices/token"
 	"github.com/kelvinator07/golang-bank-microservices/util"
 )
 
@@ -15,7 +18,6 @@ const (
 )
 
 type createAccountRequest struct {
-	UserID       int64  `json:"user_id" binding:"required,min=1"`
 	CurrencyCode string `json:"currency_code" binding:"required,currencyCode"`
 }
 
@@ -26,9 +28,10 @@ func (server *Server) createAccount(ctx *gin.Context) {
 		return
 	}
 
-	// Get user ID from request
+	// Get user ID from request header
+	authPayload := ctx.MustGet(authorizationPayloadKey).(*token.Payload)
 	arg := db.CreateAccountParams{
-		UserID:        req.UserID,
+		UserID:        authPayload.UserID,
 		AccountNumber: util.RandomAccountNumber(),
 		Status:        inactive,
 		Balance:       0,
@@ -58,11 +61,19 @@ func (server *Server) getAccount(ctx *gin.Context) {
 	account, err := server.store.GetAccount(ctx, req.ID)
 	if err != nil {
 		if err == sql.ErrNoRows {
+			err = fmt.Errorf("account with id %v doesnt exist", req.ID)
 			ctx.JSON(http.StatusNotFound, errorResponse(err))
 			return
 		}
 
 		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
+		return
+	}
+
+	authPayload := ctx.MustGet(authorizationPayloadKey).(*token.Payload)
+	if account.UserID != authPayload.UserID {
+		err := errors.New("account doesnt belong to the authenticated user")
+		ctx.JSON(http.StatusUnauthorized, errorResponse(err))
 		return
 	}
 
@@ -81,7 +92,9 @@ func (server *Server) getAllAccounts(ctx *gin.Context) {
 		return
 	}
 
+	authPayload := ctx.MustGet(authorizationPayloadKey).(*token.Payload)
 	arg := db.ListAccountsParams{
+		UserID: authPayload.UserID,
 		Limit:  req.PageSize,
 		Offset: (req.PageID - 1) * req.PageSize,
 	}

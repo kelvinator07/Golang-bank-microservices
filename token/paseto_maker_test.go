@@ -12,6 +12,7 @@ func TestPasetoMaker(t *testing.T) {
 	maker, err := NewPasetoMaker(util.RandomString(32))
 	assert.NoError(t, err)
 
+	userID := util.RandomInt(1, 10)
 	accountName := util.RandomAccountName()
 	email := util.RandomEmail()
 
@@ -19,7 +20,7 @@ func TestPasetoMaker(t *testing.T) {
 	issuedAt := time.Now()
 	expiredAt := issuedAt.Add(duration)
 
-	token, err := maker.CreateToken(accountName, email, duration)
+	token, err := maker.CreateToken(userID, accountName, email, duration)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, token)
 
@@ -38,12 +39,13 @@ func TestExpiredPasetoMakerToken(t *testing.T) {
 	maker, err := NewPasetoMaker(util.RandomString(32))
 	assert.NoError(t, err)
 
+	userID := util.RandomInt(1, 10)
 	accountName := util.RandomAccountName()
 	email := util.RandomEmail()
 
 	expiredDuration := -time.Minute
 
-	token, err := maker.CreateToken(accountName, email, expiredDuration)
+	token, err := maker.CreateToken(userID, accountName, email, expiredDuration)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, token)
 
@@ -58,12 +60,13 @@ func TestInvalidPasetoMakerToken(t *testing.T) {
 	maker, err := NewPasetoMaker(util.RandomString(32))
 	assert.NoError(t, err)
 
+	userID := util.RandomInt(1, 10)
 	accountName := util.RandomAccountName()
 	email := util.RandomEmail()
 
 	duration := time.Minute
 
-	token, err := maker.CreateToken(accountName, email, duration)
+	token, err := maker.CreateToken(userID, accountName, email, duration)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, token)
 

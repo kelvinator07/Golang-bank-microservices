@@ -1,10 +1,14 @@
 package api
 
 import (
+	"fmt"
+
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 	"github.com/go-playground/validator/v10"
 	db "github.com/kelvinator07/golang-bank-microservices/db/sqlc"
+	"github.com/kelvinator07/golang-bank-microservices/token"
+	"github.com/kelvinator07/golang-bank-microservices/util"
 )
 
 const (
@@ -15,13 +19,24 @@ const (
 )
 
 type Server struct {
-	store  db.Store
-	router *gin.Engine
+	config     util.Env
+	store      db.Store
+	tokenMaker token.Maker
+	router     *gin.Engine
 }
 
-func NewServer(store db.Store) *Server {
-	server := &Server{store: store}
-	router := gin.Default()
+func NewServer(config util.Env, store db.Store) (*Server, error) {
+	tokenMaker, err := token.NewPasetoMaker(config.TokenSymmetricKey)
+	if err != nil {
+		return nil, fmt.Errorf("cannot create token maker: %w", err)
+	}
+
+	// server := &Server{store: store}
+	server := &Server{
+		config:     config,
+		store:      store,
+		tokenMaker: tokenMaker,
+	}
 
 	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
 		v.RegisterValidation("currencyCode", validCurrency)
@@ -31,18 +46,28 @@ func NewServer(store db.Store) *Server {
 	// router.Use(RequestLogger())
 	// router.Use(ResponseLogger())
 
-	router.POST("/api/v1/accounts", server.createAccount)
-	router.GET("/api/v1/accounts/:id", server.getAccount)
-	router.GET("/api/v1/accounts", server.getAllAccounts)
+	// server.router = router
+	server.setupRouter()
+	return server, nil
+}
 
-	router.POST("/api/v1/transfers", server.createTransfer)
+func (server *Server) setupRouter() {
+	router := gin.Default()
+
+	authRoutes := router.Group("/").Use(authMiddleware(server.tokenMaker))
 
 	router.POST("/api/v1/users", server.createUser)
-	router.GET("/api/v1/users/:id", server.getOneUser)
-	router.GET("/api/v1/users", server.getAllUsers)
+	router.POST("/api/v1/users/login", server.loginUser)
+	authRoutes.GET("/api/v1/users/:id", server.getOneUser)
+	authRoutes.GET("/api/v1/users", server.getAllUsers)
+
+	authRoutes.POST("/api/v1/accounts", server.createAccount)
+	authRoutes.GET("/api/v1/accounts/:id", server.getAccount)
+	authRoutes.GET("/api/v1/accounts", server.getAllAccounts)
+
+	authRoutes.POST("/api/v1/transfers", server.createTransfer)
 
 	server.router = router
-	return server
 }
 
 func (server *Server) Start(serverAddress string) error {
@@ -51,26 +76,26 @@ func (server *Server) Start(serverAddress string) error {
 
 func errorResponse(err error) gin.H {
 	return gin.H{
-		"status":  FailedStatusCode,
-		"message": FailedStatusMessage,
-		"error":   err.Error(),
+		"status_code": FailedStatusCode,
+		"message":     FailedStatusMessage,
+		"error":       err.Error(),
 	}
 }
 
 type HttpResponse struct {
-	status  string `json:"status"`
-	message string `json:"message"`
-	data    any    `json:"data"`
+	StatusCode string `json:"status_code"`
+	Message    string `json:"message"`
+	Data       any    `json:"data"` // Use generics, also for tests
 }
 
-func NewHttpResponse(status string, message string, data any) *HttpResponse {
-	return &HttpResponse{status, message, data}
+func NewHttpResponse(statusCode string, message string, data any) *HttpResponse {
+	return &HttpResponse{statusCode, message, data}
 }
 
 func validResponse(d any) gin.H {
 	return gin.H{
-		"status":  SuccessStatusCode,
-		"data":    d,
-		"message": SuccessStatusMessage,
+		"status_code": SuccessStatusCode,
+		"data":        d,
+		"message":     SuccessStatusMessage,
 	}
 }

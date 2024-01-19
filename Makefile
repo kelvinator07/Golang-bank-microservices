@@ -33,7 +33,10 @@ test-package:
 server:
 	go run main.go
 
+start-docker:
+	docker compose down && docker rmi golang-bank-microservices-api 2> /dev/null || true && docker compose up
+
 mockgen:
 	mockgen -package mockdb -destination db/mock/store.go github.com/kelvinator07/golang-bank-microservices/db/sqlc Store
  
-.PHONY: potgres createdb dropdb migrateup migratedown sqlc format-check format-lint test test-package server mockgen
+.PHONY: potgres createdb dropdb migrateup migratedown sqlc format-check format-lint test test-package server start-docker mockgen

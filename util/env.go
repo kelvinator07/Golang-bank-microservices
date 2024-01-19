@@ -2,17 +2,21 @@ package util
 
 import (
 	"log"
+	"time"
 
 	"github.com/spf13/viper"
 )
 
 type Env struct {
-	DBDriver         string `mapstructure:"DB_DRIVER"`
-	DBSource         string `mapstructure:"DB_SOURCE"`
-	ServerAddress    string `mapstructure:"SERVER_ADDRESS"`
-	PostgresUser     string `mapstructure:"POSTGRES_USER"`
-	PostgresPassword string `mapstructure:"POSTGRES_PASSWORD"`
-	PostgresDatabase string `mapstructure:"POSTGRES_DATABASE"`
+	DBDriver             string        `mapstructure:"DB_DRIVER"`
+	DBSource             string        `mapstructure:"DB_SOURCE"`
+	ServerAddress        string        `mapstructure:"SERVER_ADDRESS"`
+	PostgresUser         string        `mapstructure:"POSTGRES_USER"`
+	PostgresPassword     string        `mapstructure:"POSTGRES_PASSWORD"`
+	PostgresDatabase     string        `mapstructure:"POSTGRES_DATABASE"`
+	TokenSymmetricKey    string        `mapstructure:"TOKEN_SYMMETRIC_KEY"`
+	AccessTokenDuration  time.Duration `mapstructure:"ACCESS_TOKEN_DURATION"`
+	RefreshTokenDuration time.Duration `mapstructure:"REFRESH_TOKEN_DURATION"`
 }
 
 // use viper package to read .env file

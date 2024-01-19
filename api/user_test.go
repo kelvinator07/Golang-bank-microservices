@@ -56,34 +56,34 @@ func TestCreateUserAPI(t *testing.T) {
 		buildStubs    func(store *mockdb.MockStore)
 		checkResponse func(recorder *httptest.ResponseRecorder)
 	}{
-		// {
-		// 	name: "OK",
-		// 	body: gin.H{
-		// 		"account_name": user.AccountName,
-		// 		"password":     password,
-		// 		"address":      user.Address,
-		// 		"gender":       user.Gender,
-		// 		"phone_number": user.PhoneNumber,
-		// 		"email":        user.Email,
-		// 	},
-		// 	buildStubs: func(store *mockdb.MockStore) {
-		// 		arg := db.CreateUserParams{
-		// 			AccountName: user.AccountName,
-		// 			Address:     user.Address,
-		// 			Gender:      user.Gender,
-		// 			PhoneNumber: user.PhoneNumber,
-		// 			Email:       user.Email,
-		// 		}
-		// 		store.EXPECT().
-		// 			CreateUser(gomock.Any(), EqCreateUserParams(arg, password)).
-		// 			Times(1).
-		// 			Return(user, nil)
-		// 	},
-		// 	checkResponse: func(recorder *httptest.ResponseRecorder) {
-		// 		assert.Equal(t, http.StatusOK, recorder.Code)
-		// 		requiredBodyMatchUser(t, recorder.Body, user)
-		// 	},
-		// },
+		{
+			name: "OK",
+			body: gin.H{
+				"account_name": user.AccountName,
+				"password":     password,
+				"address":      user.Address,
+				"gender":       user.Gender,
+				"phone_number": user.PhoneNumber,
+				"email":        user.Email,
+			},
+			buildStubs: func(store *mockdb.MockStore) {
+				arg := db.CreateUserParams{
+					AccountName: user.AccountName,
+					Address:     user.Address,
+					Gender:      user.Gender,
+					PhoneNumber: user.PhoneNumber,
+					Email:       user.Email,
+				}
+				store.EXPECT().
+					CreateUser(gomock.Any(), EqCreateUserParams(arg, password)).
+					Times(1).
+					Return(user, nil)
+			},
+			checkResponse: func(recorder *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusOK, recorder.Code)
+				requiredBodyMatchUser(t, recorder.Body, user)
+			},
+		},
 		{
 			name: "Internal Error",
 			body: gin.H{
@@ -155,7 +155,7 @@ func TestCreateUserAPI(t *testing.T) {
 			tc.buildStubs(store)
 
 			// start test server and send request
-			server := NewServer(store)
+			server := newTestServer(t, store)
 			recorder := httptest.NewRecorder()
 
 			// Marshal body data to JSON
@@ -192,11 +192,20 @@ func requiredBodyMatchUser(t *testing.T, body *bytes.Buffer, user db.User) {
 	data, err := io.ReadAll(body)
 	assert.NoError(t, err)
 
-	var expectedUser db.User
-	err = json.Unmarshal(data, &expectedUser)
-
-	fmt.Println("expectedUser ", expectedUser)
+	// expectedResult is a map
+	var expectedResult HttpResponse
+	err = json.Unmarshal(data, &expectedResult)
 	assert.NoError(t, err)
+
+	// Convert the map to JSON
+	expectedUserJson, err := json.Marshal(expectedResult.Data)
+	assert.NoError(t, err)
+
+	// Convert the JSON to a struct
+	var expectedUser db.User
+	err = json.Unmarshal(expectedUserJson, &expectedUser)
+	assert.NoError(t, err)
+
+	assert.Equal(t, SuccessStatusCode, expectedResult.StatusCode)
 	assert.Equal(t, user.Email, expectedUser.Email)
-	// assert.Equal(t, user, expectedUser)
 }

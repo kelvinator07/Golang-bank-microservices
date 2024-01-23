@@ -65,6 +65,51 @@ func (q *Queries) DeleteUser(ctx context.Context, id int64) error {
 	return err
 }
 
+const getAllUsers = `-- name: GetAllUsers :many
+SELECT id, account_name, hashed_password, address, gender, phone_number, email, password_changed_at, created_at FROM users
+WHERE id > $1
+ORDER BY id
+LIMIT $2
+`
+
+type GetAllUsersParams struct {
+	ID    int64 `json:"id"`
+	Limit int32 `json:"limit"`
+}
+
+func (q *Queries) GetAllUsers(ctx context.Context, arg GetAllUsersParams) ([]User, error) {
+	rows, err := q.db.QueryContext(ctx, getAllUsers, arg.ID, arg.Limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []User{}
+	for rows.Next() {
+		var i User
+		if err := rows.Scan(
+			&i.ID,
+			&i.AccountName,
+			&i.HashedPassword,
+			&i.Address,
+			&i.Gender,
+			&i.PhoneNumber,
+			&i.Email,
+			&i.PasswordChangedAt,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getUser = `-- name: GetUser :one
 SELECT id, account_name, hashed_password, address, gender, phone_number, email, password_changed_at, created_at FROM users
 WHERE id = $1 LIMIT 1

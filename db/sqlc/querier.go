@@ -20,6 +20,7 @@ type Querier interface {
 	DeleteUser(ctx context.Context, id int64) error
 	GetAccount(ctx context.Context, id int64) (Account, error)
 	GetAccountForUpdate(ctx context.Context, id int64) (Account, error)
+	GetAllUsers(ctx context.Context, arg GetAllUsersParams) ([]User, error)
 	GetEntry(ctx context.Context, id int64) (Entry, error)
 	GetTransfer(ctx context.Context, id int64) (Transfer, error)
 	GetUser(ctx context.Context, id int64) (User, error)

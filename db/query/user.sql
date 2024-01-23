@@ -29,6 +29,12 @@ ORDER BY id
 LIMIT $1
 OFFSET $2;
 
+-- name: GetAllUsers :many
+SELECT * FROM users
+WHERE id > $1
+ORDER BY id
+LIMIT $2;
+
 -- name: UpdateUser :one
 UPDATE users
 SET address = $2

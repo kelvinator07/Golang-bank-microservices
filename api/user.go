@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -78,7 +79,7 @@ func (server *Server) createUser(ctx *gin.Context) {
 		Email:       user.Email,
 	}
 
-	ctx.JSON(http.StatusOK, validResponse(res))
+	ctx.JSON(http.StatusOK, NewHttpResponseG("00", "Success", res))
 }
 
 type loginUserRequest struct {
@@ -175,8 +176,8 @@ func (server *Server) getOneUser(ctx *gin.Context) {
 }
 
 type getAllUsersRequest struct {
-	PageID   int32 `form:"page_id" binding:"required,min=1"`
-	PageSize int32 `form:"page_size" binding:"required,min=5,max=10"`
+	PageID   int32 `form:"page_id"`
+	PageSize int32 `form:"page_size"`
 }
 
 func (server *Server) getAllUsers(ctx *gin.Context) {
@@ -184,6 +185,14 @@ func (server *Server) getAllUsers(ctx *gin.Context) {
 	if err := ctx.ShouldBindQuery(&req); err != nil {
 		ctx.JSON(http.StatusBadRequest, errorResponse(err))
 		return
+	}
+	// Set default
+	if req.PageID <= 0 {
+		req.PageID = 1
+	}
+
+	if req.PageSize <= 0 {
+		req.PageSize = 10
 	}
 
 	arg := db.ListUsersParams{
@@ -210,4 +219,57 @@ func (server *Server) getAllUsers(ctx *gin.Context) {
 	}
 
 	ctx.JSON(http.StatusOK, validResponse(usersList))
+}
+
+type getAllUsersRequest2 struct {
+	Limit  int32 `form:"limit"`
+	Cursor int64 `form:"cursor"`
+}
+
+type getAllUsersResponse2 struct {
+	Users  []createUserResponse `form:"users"`
+	Cursor int64                `form:"cursor"`
+}
+
+func (server *Server) getAllUsers2(ctx *gin.Context) {
+	limit, _ := strconv.Atoi(ctx.DefaultQuery("limit", "10"))
+	cursor, _ := strconv.Atoi(ctx.DefaultQuery("cursor", "0"))
+
+	// GET /payments?limit=10
+	// GET /payments?limit=10&cursor=last_id_from_previous_fetch
+
+	// SELECT * FROM users WHERE id > $1 ORDER BY id LIMIT $2;
+
+	arg := db.GetAllUsersParams{
+		ID:    int64(cursor),
+		Limit: int32(limit),
+	}
+
+	users, err := server.store.GetAllUsers(ctx, arg)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
+		return
+	}
+
+	var usersList []createUserResponse
+	for _, user := range users {
+		usersList = append(usersList, createUserResponse{
+			UserID:      user.ID,
+			AccountName: user.AccountName,
+			Address:     user.Address,
+			Gender:      user.Gender,
+			PhoneNumber: user.PhoneNumber,
+			Email:       user.Email,
+		})
+	}
+
+	var nextCursor int64
+	if len(usersList) > 0 {
+		nextCursor = usersList[len(usersList)-1].UserID // lastID
+	}
+
+	ctx.JSON(http.StatusOK, validResponse(getAllUsersResponse2{
+		Users:  usersList,
+		Cursor: nextCursor,
+	}))
 }

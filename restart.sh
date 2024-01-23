@@ -2,4 +2,4 @@
 
 echo "start"
 
-docker compose down && docker rmi golang-bank-microservices-api 2> /dev/null || true && docker compose up 
+docker compose down && docker rmi golang-bank-microservices-api -f 2> /dev/null || true && docker compose up 

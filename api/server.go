@@ -59,7 +59,8 @@ func (server *Server) setupRouter() {
 	router.POST("/api/v1/users", server.createUser)
 	router.POST("/api/v1/users/login", server.loginUser)
 	authRoutes.GET("/api/v1/users/:id", server.getOneUser)
-	authRoutes.GET("/api/v1/users", server.getAllUsers)
+	authRoutes.GET("/api/v1/users", server.getAllUsers2)
+	// authRoutes.GET("/api/v1/users", server.getAllUsers2)
 
 	authRoutes.POST("/api/v1/accounts", server.createAccount)
 	authRoutes.GET("/api/v1/accounts/:id", server.getAccount)
@@ -98,4 +99,24 @@ func validResponse(d any) gin.H {
 		"data":        d,
 		"message":     SuccessStatusMessage,
 	}
+}
+
+type HttpResponseG[T any] struct {
+	StatusCode string `json:"status_code"`
+	Message    string `json:"message"`
+	Data       any    `json:"data"` // Use generics, also for tests
+}
+
+func NewHttpResponseG[T any](statusCode string, message string, data T) *HttpResponseG[T] {
+	return &HttpResponseG[T]{statusCode, message, data}
+}
+
+type ErrorResponse struct {
+	StatusCode string `json:"status_code"`
+	Message    string `json:"message"`
+	Error      string `json:"error"`
+}
+
+func NewErrorResponse(statusCode string, message string, e error) *ErrorResponse {
+	return &ErrorResponse{statusCode, message, e.Error()}
 }

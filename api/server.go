@@ -46,7 +46,6 @@ func NewServer(config util.Env, store db.Store) (*Server, error) {
 	// router.Use(RequestLogger())
 	// router.Use(ResponseLogger())
 
-	// server.router = router
 	server.setupRouter()
 	return server, nil
 }
@@ -54,10 +53,11 @@ func NewServer(config util.Env, store db.Store) (*Server, error) {
 func (server *Server) setupRouter() {
 	router := gin.Default()
 
-	authRoutes := router.Group("/").Use(authMiddleware(server.tokenMaker))
-
 	router.POST("/api/v1/users", server.createUser)
 	router.POST("/api/v1/users/login", server.loginUser)
+	router.POST("/api/v1/tokens/renew_access", server.renewAccessToken)
+
+	authRoutes := router.Group("/").Use(authMiddleware(server.tokenMaker))
 	authRoutes.GET("/api/v1/users/:id", server.getOneUser)
 	authRoutes.GET("/api/v1/users", server.getAllUsers2)
 	// authRoutes.GET("/api/v1/users", server.getAllUsers2)
@@ -101,14 +101,14 @@ func validResponse(d any) gin.H {
 	}
 }
 
-type HttpResponseG[T any] struct {
+type ValidHttpResponse[T any] struct {
 	StatusCode string `json:"status_code"`
 	Message    string `json:"message"`
 	Data       any    `json:"data"` // Use generics, also for tests
 }
 
-func NewHttpResponseG[T any](statusCode string, message string, data T) *HttpResponseG[T] {
-	return &HttpResponseG[T]{statusCode, message, data}
+func NewValidHttpResponse[T any](data T) *ValidHttpResponse[T] {
+	return &ValidHttpResponse[T]{SuccessStatusCode, SuccessStatusMessage, data}
 }
 
 type ErrorResponse struct {

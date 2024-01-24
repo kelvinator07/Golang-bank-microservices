@@ -15,6 +15,9 @@ migrateup:
 migratedown:
 	migrate -path db/migration -database "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost:5432/${POSTGRES_DATABASE}?sslmode=disable" -verbose down
 
+addmigration:
+	migrate create -ext sql -dir db/migration -seq ${name}
+
 sqlc:
 	sqlc generate
 
@@ -39,4 +42,4 @@ start-docker:
 mockgen:
 	mockgen -package mockdb -destination db/mock/store.go github.com/kelvinator07/golang-bank-microservices/db/sqlc Store
  
-.PHONY: potgres createdb dropdb migrateup migratedown sqlc format-check format-lint test test-package server start-docker mockgen
+.PHONY: potgres createdb dropdb migrateup migratedown addmigration sqlc format-check format-lint test test-package server start-docker mockgen

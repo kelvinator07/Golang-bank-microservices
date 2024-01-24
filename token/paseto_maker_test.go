@@ -20,11 +20,12 @@ func TestPasetoMaker(t *testing.T) {
 	issuedAt := time.Now()
 	expiredAt := issuedAt.Add(duration)
 
-	token, err := maker.CreateToken(userID, accountName, email, duration)
+	token, payload, err := maker.CreateToken(userID, accountName, email, duration)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, token)
+	assert.NotEmpty(t, payload)
 
-	payload, err := maker.VerifyToken(token)
+	payload, err = maker.VerifyToken(token)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, payload)
 
@@ -45,11 +46,12 @@ func TestExpiredPasetoMakerToken(t *testing.T) {
 
 	expiredDuration := -time.Minute
 
-	token, err := maker.CreateToken(userID, accountName, email, expiredDuration)
+	token, payload, err := maker.CreateToken(userID, accountName, email, expiredDuration)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, token)
+	assert.NotEmpty(t, payload)
 
-	payload, err := maker.VerifyToken(token)
+	payload, err = maker.VerifyToken(token)
 	assert.Error(t, err)
 	assert.EqualError(t, err, ErrExpiredToken.Error())
 
@@ -66,13 +68,14 @@ func TestInvalidPasetoMakerToken(t *testing.T) {
 
 	duration := time.Minute
 
-	token, err := maker.CreateToken(userID, accountName, email, duration)
+	token, payload, err := maker.CreateToken(userID, accountName, email, duration)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, token)
+	assert.NotEmpty(t, payload)
 
 	token = token[:len(token)-6] + "invaliddata"
 
-	payload, err := maker.VerifyToken(token)
+	payload, err = maker.VerifyToken(token)
 	assert.Error(t, err)
 	assert.EqualError(t, err, ErrInvalidToken.Error())
 

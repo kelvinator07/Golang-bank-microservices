@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	db "github.com/kelvinator07/golang-bank-microservices/db/sqlc"
 	"github.com/kelvinator07/golang-bank-microservices/token"
 	"github.com/kelvinator07/golang-bank-microservices/util"
@@ -25,12 +26,25 @@ type createUserRequest struct {
 }
 
 type createUserResponse struct {
-	UserID      int64  `json:"user_id"`
-	AccountName string `json:"account_name"`
-	Address     string `json:"address"`
-	Gender      string `json:"gender"`
-	PhoneNumber int64  `json:"phone_number"`
-	Email       string `json:"email"`
+	UserID      int64     `json:"user_id"`
+	AccountName string    `json:"account_name"`
+	Address     string    `json:"address"`
+	Gender      string    `json:"gender"`
+	PhoneNumber int64     `json:"phone_number"`
+	Email       string    `json:"email"`
+	CreatedAt   time.Time `json:"created_at"`
+}
+
+func newUserResponse(user db.User) createUserResponse {
+	return createUserResponse{
+		UserID:      user.ID,
+		AccountName: user.AccountName,
+		Address:     user.Address,
+		Gender:      user.Gender,
+		PhoneNumber: user.PhoneNumber,
+		Email:       user.Email,
+		CreatedAt:   user.CreatedAt,
+	}
 }
 
 func (server *Server) createUser(ctx *gin.Context) {
@@ -47,7 +61,6 @@ func (server *Server) createUser(ctx *gin.Context) {
 		return
 	}
 
-	// Get user ID from request
 	arg := db.CreateUserParams{
 		AccountName:    req.AccountName,
 		HashedPassword: hashedPassword,
@@ -70,16 +83,7 @@ func (server *Server) createUser(ctx *gin.Context) {
 		return
 	}
 
-	res := createUserResponse{
-		UserID:      user.ID,
-		AccountName: user.AccountName,
-		Address:     user.Address,
-		Gender:      user.Gender,
-		PhoneNumber: user.PhoneNumber,
-		Email:       user.Email,
-	}
-
-	ctx.JSON(http.StatusOK, NewHttpResponseG("00", "Success", res))
+	ctx.JSON(http.StatusOK, NewValidHttpResponse(newUserResponse(user)))
 }
 
 type loginUserRequest struct {
@@ -88,10 +92,12 @@ type loginUserRequest struct {
 }
 
 type loginUserResponse struct {
-	AccessToken           string    `json:"access_token"`
-	AccessTokenExpiresAt  time.Time `json:"access_token_expires_at"`
-	RefreshToken          string    `json:"refresh_token"`
-	RefreshTokenExpiresAt time.Time `json:"refresh_token_expires_at"`
+	SessionID             uuid.UUID          `json:"session_id"`
+	AccessToken           string             `json:"access_token"`
+	AccessTokenExpiresAt  time.Time          `json:"access_token_expires_at"`
+	RefreshToken          string             `json:"refresh_token"`
+	RefreshTokenExpiresAt time.Time          `json:"refresh_token_expires_at"`
+	User                  createUserResponse `json:"user"`
 }
 
 func (server *Server) loginUser(ctx *gin.Context) {
@@ -103,13 +109,12 @@ func (server *Server) loginUser(ctx *gin.Context) {
 
 	user, err := server.store.GetUserByEmail(ctx, req.Email)
 	if err != nil {
-		// if errors.Is(err, db.ErrRecordNotFound) {
-		// 	err = fmt.Errorf("user with email %s doesn't exist", req.Email)
-		// 	ctx.JSON(http.StatusNotFound, errorResponse(err))
-		// 	return
-		// }
-		err = fmt.Errorf("user with email %s doesn't exist", req.Email)
-		ctx.JSON(http.StatusNotFound, errorResponse(err))
+		if err == sql.ErrNoRows {
+			err = fmt.Errorf("user with email %s doesn't exist", req.Email)
+			ctx.JSON(http.StatusNotFound, errorResponse(err))
+			return
+		}
+		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
 		return
 	}
 
@@ -120,17 +125,43 @@ func (server *Server) loginUser(ctx *gin.Context) {
 		return
 	}
 
-	token, err := server.tokenMaker.CreateToken(user.ID, user.AccountName, user.Email, time.Hour)
+	accessToken, accessPayload, err := server.tokenMaker.CreateToken(user.ID, user.AccountName, user.Email, server.config.AccessTokenDuration)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
+		return
+	}
+
+	refreshToken, refreshPayload, err := server.tokenMaker.CreateToken(user.ID, user.AccountName, user.Email, server.config.RefreshTokenDuration)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
+		return
+	}
+
+	session, err := server.store.CreateSession(ctx, db.CreateSessionParams{
+		ID:           refreshPayload.ID,
+		Email:        user.Email,
+		RefreshToken: refreshToken,
+		UserAgent:    ctx.Request.UserAgent(),
+		ClientIp:     ctx.ClientIP(),
+		IsBlocked:    false,
+		ExpiresAt:    refreshPayload.ExpiredAt,
+	})
+
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
 		return
 	}
 
 	res := loginUserResponse{
-		AccessToken: token,
+		SessionID:             session.ID,
+		AccessToken:           accessToken,
+		AccessTokenExpiresAt:  accessPayload.ExpiredAt,
+		RefreshToken:          refreshToken,
+		RefreshTokenExpiresAt: refreshPayload.ExpiredAt,
+		User:                  newUserResponse(user),
 	}
 
-	ctx.JSON(http.StatusOK, validResponse(res))
+	ctx.JSON(http.StatusOK, NewValidHttpResponse(res))
 }
 
 type getUserRequest struct {

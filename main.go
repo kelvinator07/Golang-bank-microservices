@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"log"
+	"os"
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/kelvinator07/golang-bank-microservices/api"
@@ -28,6 +29,9 @@ func main() {
 	// run db migration
 	runDBMigration(config.MigrationURL, config.DBSource)
 
+	// load test data
+	loadTestData(conn)
+
 	store := db.NewStore(conn)
 	server, err := api.NewServer(config, store)
 	if err != nil {
@@ -51,4 +55,20 @@ func runDBMigration(migrationURL string, dbSource string) {
 	}
 
 	log.Println("db migrated succesfully")
+}
+
+func loadTestData(db *sql.DB) {
+	// Read file
+	file, err := os.ReadFile("./testdata.sql")
+	if err != nil {
+		log.Fatal("read file error: ", err.Error())
+	}
+
+	// Execute file
+	_, err = db.Exec(string(file))
+	if err != nil {
+		log.Fatal("execute file error: ", err.Error())
+	}
+
+	log.Println("test data loaded succesfully")
 }

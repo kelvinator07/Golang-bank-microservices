@@ -10,9 +10,11 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/hibiken/asynq"
 	db "github.com/kelvinator07/golang-bank-microservices/db/sqlc"
 	"github.com/kelvinator07/golang-bank-microservices/token"
 	"github.com/kelvinator07/golang-bank-microservices/util"
+	"github.com/kelvinator07/golang-bank-microservices/worker"
 	"github.com/lib/pq"
 )
 
@@ -79,6 +81,23 @@ func (server *Server) createUser(ctx *gin.Context) {
 				return
 			}
 		}
+		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
+		return
+	}
+
+	// send verification email
+	// TODO use db transaction
+	taskPayload := &worker.PayloadSendVerifyEmail{Email: user.Email}
+
+	opts := []asynq.Option{
+		asynq.MaxRetry(10),
+		asynq.ProcessIn(10 * time.Second),
+		asynq.Queue(worker.QueueCritical),
+	}
+
+	err = server.taskDistributor.DistributeTaskSendVerifyEmail(ctx, taskPayload, opts...)
+	if err != nil {
+		err = fmt.Errorf("failed to distribute task to send verify email")
 		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
 		return
 	}

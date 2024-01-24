@@ -6,9 +6,11 @@ import (
 	"os"
 
 	"github.com/golang-migrate/migrate/v4"
+	"github.com/hibiken/asynq"
 	"github.com/kelvinator07/golang-bank-microservices/api"
 	db "github.com/kelvinator07/golang-bank-microservices/db/sqlc"
 	"github.com/kelvinator07/golang-bank-microservices/util"
+	"github.com/kelvinator07/golang-bank-microservices/worker"
 
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
@@ -30,10 +32,19 @@ func main() {
 	runDBMigration(config.MigrationURL, config.DBSource)
 
 	// load test data
-	loadTestData(conn)
+	// loadTestData(conn)
 
 	store := db.NewStore(conn)
-	server, err := api.NewServer(config, store)
+
+	redisOpt := asynq.RedisClientOpt{
+		Addr: config.RedisAddress,
+	}
+
+	taskDistributor := worker.NewRedisTaskDistributor(redisOpt)
+
+	go runTaskProcessor(redisOpt, store)
+
+	server, err := api.NewServer(config, store, taskDistributor)
 	if err != nil {
 		log.Fatal("Cannot connect to config: ", err)
 	}
@@ -41,6 +52,15 @@ func main() {
 	err = server.Start(config.ServerAddress)
 	if err != nil {
 		log.Fatal("Cannot start server: ", err)
+	}
+}
+
+func runTaskProcessor(redisOpt asynq.RedisClientOpt, store db.Store) {
+	taskProcessor := worker.NewRedisTaskProcessor(redisOpt, store)
+	log.Println("Starting task processor")
+	err := taskProcessor.Start()
+	if err != nil {
+		log.Fatal("Failed to start task processor: ", err)
 	}
 }
 

@@ -9,6 +9,7 @@ import (
 	db "github.com/kelvinator07/golang-bank-microservices/db/sqlc"
 	"github.com/kelvinator07/golang-bank-microservices/token"
 	"github.com/kelvinator07/golang-bank-microservices/util"
+	"github.com/kelvinator07/golang-bank-microservices/worker"
 )
 
 const (
@@ -19,23 +20,24 @@ const (
 )
 
 type Server struct {
-	config     util.Env
-	store      db.Store
-	tokenMaker token.Maker
-	router     *gin.Engine
+	config          util.Env
+	store           db.Store
+	tokenMaker      token.Maker
+	router          *gin.Engine
+	taskDistributor worker.TaskDistributor
 }
 
-func NewServer(config util.Env, store db.Store) (*Server, error) {
+func NewServer(config util.Env, store db.Store, taskDistributor worker.TaskDistributor) (*Server, error) {
 	tokenMaker, err := token.NewPasetoMaker(config.TokenSymmetricKey)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create token maker: %w", err)
 	}
 
-	// server := &Server{store: store}
 	server := &Server{
-		config:     config,
-		store:      store,
-		tokenMaker: tokenMaker,
+		config:          config,
+		store:           store,
+		tokenMaker:      tokenMaker,
+		taskDistributor: taskDistributor,
 	}
 
 	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {

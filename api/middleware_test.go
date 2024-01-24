@@ -87,7 +87,7 @@ func TestAuthMiddleware(t *testing.T) {
 
 		t.Run(tc.name, func(t *testing.T) {
 			// start test server and send request
-			server := newTestServer(t, nil)
+			server := newTestServer(t, nil, nil)
 
 			authUrl := "/api/v1/auth"
 			server.router.GET(

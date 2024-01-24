@@ -31,7 +31,7 @@ format-lint:
 	gofmt -s -w .
 
 test:
-	go test -v -cover ./...
+	go test -v -cover -short ./...
 
 test-package: 
 	go test -v ./${pn}/...
@@ -44,5 +44,8 @@ start-docker:
 
 mockgen:
 	mockgen -package mockdb -destination db/mock/store.go github.com/kelvinator07/golang-bank-microservices/db/sqlc Store
+
+redis:
+	docker run --name redis -p 6379:6379 -d redis:7-alpine
  
-.PHONY: potgres postgres-stop createdb dropdb migrateup migratedown addmigration sqlc format-check format-lint test test-package server start-docker mockgen
+.PHONY: potgres postgres-stop createdb dropdb migrateup migratedown addmigration sqlc format-check format-lint test test-package server start-docker mockgen redis

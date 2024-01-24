@@ -10,6 +10,7 @@ import (
 type Env struct {
 	DBDriver             string        `mapstructure:"DB_DRIVER"`
 	DBSource             string        `mapstructure:"DB_SOURCE"`
+	MigrationURL         string        `mapstructure:"MIGRATION_URL"`
 	ServerAddress        string        `mapstructure:"SERVER_ADDRESS"`
 	PostgresUser         string        `mapstructure:"POSTGRES_USER"`
 	PostgresPassword     string        `mapstructure:"POSTGRES_PASSWORD"`

@@ -6,6 +6,7 @@ import (
 
 	"github.com/hibiken/asynq"
 	db "github.com/kelvinator07/golang-bank-microservices/db/sqlc"
+	"github.com/kelvinator07/golang-bank-microservices/mail"
 )
 
 const (
@@ -21,21 +22,23 @@ type TaskProcessor interface {
 type RedisTaskProcessor struct {
 	server *asynq.Server
 	store  db.Store
+	mailer mail.EmailSender
 }
 
-func NewRedisTaskProcessor(redisOpt asynq.RedisClientOpt, store db.Store) TaskProcessor {
+func NewRedisTaskProcessor(redisOpt asynq.RedisClientOpt, store db.Store, mailer mail.EmailSender) TaskProcessor {
 	server := asynq.NewServer(redisOpt, asynq.Config{
 		Queues: map[string]int{
 			QueueCritical: 10,
 			QueueDefault:  5,
 		},
 		ErrorHandler: asynq.ErrorHandlerFunc(func(ctx context.Context, task *asynq.Task, err error) {
-			log.Fatal("NewRedisTaskProcessor Error Type %w and task payload: %w ", task.Type(), string(task.Payload()))
+			log.Fatal("NewRedisTaskProcessor Error Type 1 and task payload: 2", task.Type(), string(task.Payload()))
 		}),
 	})
 	return &RedisTaskProcessor{
 		server: server,
 		store:  store,
+		mailer: mailer,
 	}
 }
 

@@ -7,6 +7,7 @@ package db
 
 import (
 	"context"
+	"database/sql"
 )
 
 const createUser = `-- name: CreateUser :one
@@ -19,7 +20,7 @@ INSERT INTO users (
   email
 ) VALUES (
   $1, $2, $3, $4, $5, $6
-) RETURNING id, account_name, hashed_password, address, gender, phone_number, email, password_changed_at, created_at
+) RETURNING id, account_name, hashed_password, address, gender, phone_number, email, password_changed_at, created_at, is_email_verified
 `
 
 type CreateUserParams struct {
@@ -51,6 +52,7 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.Email,
 		&i.PasswordChangedAt,
 		&i.CreatedAt,
+		&i.IsEmailVerified,
 	)
 	return i, err
 }
@@ -66,7 +68,7 @@ func (q *Queries) DeleteUser(ctx context.Context, id int64) error {
 }
 
 const getAllUsers = `-- name: GetAllUsers :many
-SELECT id, account_name, hashed_password, address, gender, phone_number, email, password_changed_at, created_at FROM users
+SELECT id, account_name, hashed_password, address, gender, phone_number, email, password_changed_at, created_at, is_email_verified FROM users
 WHERE id > $1
 ORDER BY id
 LIMIT $2
@@ -96,6 +98,7 @@ func (q *Queries) GetAllUsers(ctx context.Context, arg GetAllUsersParams) ([]Use
 			&i.Email,
 			&i.PasswordChangedAt,
 			&i.CreatedAt,
+			&i.IsEmailVerified,
 		); err != nil {
 			return nil, err
 		}
@@ -111,7 +114,7 @@ func (q *Queries) GetAllUsers(ctx context.Context, arg GetAllUsersParams) ([]Use
 }
 
 const getUser = `-- name: GetUser :one
-SELECT id, account_name, hashed_password, address, gender, phone_number, email, password_changed_at, created_at FROM users
+SELECT id, account_name, hashed_password, address, gender, phone_number, email, password_changed_at, created_at, is_email_verified FROM users
 WHERE id = $1 LIMIT 1
 `
 
@@ -128,12 +131,13 @@ func (q *Queries) GetUser(ctx context.Context, id int64) (User, error) {
 		&i.Email,
 		&i.PasswordChangedAt,
 		&i.CreatedAt,
+		&i.IsEmailVerified,
 	)
 	return i, err
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, account_name, hashed_password, address, gender, phone_number, email, password_changed_at, created_at FROM users
+SELECT id, account_name, hashed_password, address, gender, phone_number, email, password_changed_at, created_at, is_email_verified FROM users
 WHERE email = $1 LIMIT 1
 `
 
@@ -150,12 +154,13 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 		&i.Email,
 		&i.PasswordChangedAt,
 		&i.CreatedAt,
+		&i.IsEmailVerified,
 	)
 	return i, err
 }
 
 const getUserForUpdate = `-- name: GetUserForUpdate :one
-SELECT id, account_name, hashed_password, address, gender, phone_number, email, password_changed_at, created_at FROM users
+SELECT id, account_name, hashed_password, address, gender, phone_number, email, password_changed_at, created_at, is_email_verified FROM users
 WHERE id = $1 LIMIT 1 
 FOR NO KEY UPDATE
 `
@@ -173,12 +178,13 @@ func (q *Queries) GetUserForUpdate(ctx context.Context, id int64) (User, error) 
 		&i.Email,
 		&i.PasswordChangedAt,
 		&i.CreatedAt,
+		&i.IsEmailVerified,
 	)
 	return i, err
 }
 
 const listUsers = `-- name: ListUsers :many
-SELECT id, account_name, hashed_password, address, gender, phone_number, email, password_changed_at, created_at FROM users
+SELECT id, account_name, hashed_password, address, gender, phone_number, email, password_changed_at, created_at, is_email_verified FROM users
 ORDER BY id
 LIMIT $1
 OFFSET $2
@@ -208,6 +214,7 @@ func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]User, e
 			&i.Email,
 			&i.PasswordChangedAt,
 			&i.CreatedAt,
+			&i.IsEmailVerified,
 		); err != nil {
 			return nil, err
 		}
@@ -224,18 +231,39 @@ func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]User, e
 
 const updateUser = `-- name: UpdateUser :one
 UPDATE users
-SET address = $2
-WHERE id = $1
-RETURNING id, account_name, hashed_password, address, gender, phone_number, email, password_changed_at, created_at
+SET
+  account_name = COALESCE($1, account_name),
+  hashed_password = COALESCE($2, hashed_password),
+  password_changed_at = COALESCE($3, password_changed_at),
+  address = COALESCE($4, address),
+  phone_number = COALESCE($5, phone_number),
+  email = COALESCE($6, email),
+  is_email_verified = COALESCE($7, is_email_verified)
+WHERE
+  email = $6
+RETURNING id, account_name, hashed_password, address, gender, phone_number, email, password_changed_at, created_at, is_email_verified
 `
 
 type UpdateUserParams struct {
-	ID      int64  `json:"id"`
-	Address string `json:"address"`
+	AccountName       sql.NullString `json:"account_name"`
+	HashedPassword    sql.NullString `json:"hashed_password"`
+	PasswordChangedAt sql.NullTime   `json:"password_changed_at"`
+	Address           sql.NullString `json:"address"`
+	PhoneNumber       sql.NullInt64  `json:"phone_number"`
+	Email             sql.NullString `json:"email"`
+	IsEmailVerified   sql.NullBool   `json:"is_email_verified"`
 }
 
 func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (User, error) {
-	row := q.db.QueryRowContext(ctx, updateUser, arg.ID, arg.Address)
+	row := q.db.QueryRowContext(ctx, updateUser,
+		arg.AccountName,
+		arg.HashedPassword,
+		arg.PasswordChangedAt,
+		arg.Address,
+		arg.PhoneNumber,
+		arg.Email,
+		arg.IsEmailVerified,
+	)
 	var i User
 	err := row.Scan(
 		&i.ID,
@@ -247,6 +275,7 @@ func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (User, e
 		&i.Email,
 		&i.PasswordChangedAt,
 		&i.CreatedAt,
+		&i.IsEmailVerified,
 	)
 	return i, err
 }

@@ -323,3 +323,42 @@ func (server *Server) getAllUsers2(ctx *gin.Context) {
 		Cursor: nextCursor,
 	}))
 }
+
+type verifyEmailRequest struct {
+	EmailId    int64  `form:"email_id" binding:"required,min=1"`
+	SecretCode string `form:"secret_code" binding:"required,min=32"`
+}
+
+func (server *Server) verifyEmail(ctx *gin.Context) {
+	var req verifyEmailRequest
+	if err := ctx.ShouldBindQuery(&req); err != nil {
+		ctx.JSON(http.StatusBadRequest, errorResponse(err))
+		return
+	}
+
+	result, err := server.store.VerifyEmailTx(ctx, db.VerifyEmailTxParams{
+		EmailId:    req.EmailId,
+		SecretCode: req.SecretCode,
+	})
+	if err != nil {
+		if err == sql.ErrNoRows {
+			err = fmt.Errorf("verify email with id %v doesn't exist", req.EmailId)
+			ctx.JSON(http.StatusBadRequest, errorResponse(err))
+			return
+		}
+		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
+		return
+	}
+
+	ctx.JSON(http.StatusOK, NewHttpResponse(SuccessStatusCode, SuccessStatusMessage,
+		map[string]bool{"is_email_verified": result.User.IsEmailVerified}))
+}
+
+// TODO Request another verify email
+type emailVerificationRequest struct {
+	Email string `form:"email" binding:"required"`
+}
+
+func (server *Server) requestEmailVerification(ctx *gin.Context) {
+	// send email verify to queue
+}

@@ -9,6 +9,8 @@ import (
 	"log"
 
 	"github.com/hibiken/asynq"
+	db "github.com/kelvinator07/golang-bank-microservices/db/sqlc"
+	"github.com/kelvinator07/golang-bank-microservices/util"
 )
 
 const TaskSendVerifyEmail = "task:send_verify_email"
@@ -53,7 +55,28 @@ func (processor *RedisTaskProcessor) ProcessTaskSendVerifyEmail(ctx context.Cont
 		return fmt.Errorf("failed to get user %w", err)
 	}
 
+	verifyEmail, err := processor.store.CreateVerifyEmail(ctx, db.CreateVerifyEmailParams{
+		Email:      user.Email,
+		SecretCode: util.RandomString(32),
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create verify email %w", err)
+	}
+
 	// Send Email to user
+	subject := "Welcome to Golang Bank"
+	verifyUrl := fmt.Sprintf("http://localhost:8080/verify-email?email_id=%d&secret_code=%s", verifyEmail.ID, verifyEmail.SecretCode)
+	content := fmt.Sprintf(`Hello %s, <br/>
+	Thank you for registering with us! <br/>
+	Please <a href="%s">click here</a> to verify your email adddress.<br/>
+	`, user.AccountName, verifyUrl)
+	to := []string{user.Email}
+
+	err = processor.mailer.SendEmail(subject, content, to, nil, nil, nil)
+	if err != nil {
+		return fmt.Errorf("failed to send verify email %w", err)
+	}
+
 	log.Printf("RedisTaskProcessor Type %v and task payload: %v for user: %v", task.Type(), string(task.Payload()), user.Email)
 
 	return nil

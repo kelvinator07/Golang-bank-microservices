@@ -9,6 +9,7 @@ import (
 	"github.com/hibiken/asynq"
 	"github.com/kelvinator07/golang-bank-microservices/api"
 	db "github.com/kelvinator07/golang-bank-microservices/db/sqlc"
+	"github.com/kelvinator07/golang-bank-microservices/mail"
 	"github.com/kelvinator07/golang-bank-microservices/util"
 	"github.com/kelvinator07/golang-bank-microservices/worker"
 
@@ -42,7 +43,7 @@ func main() {
 
 	taskDistributor := worker.NewRedisTaskDistributor(redisOpt)
 
-	go runTaskProcessor(redisOpt, store)
+	go runTaskProcessor(config, redisOpt, store)
 
 	server, err := api.NewServer(config, store, taskDistributor)
 	if err != nil {
@@ -55,8 +56,10 @@ func main() {
 	}
 }
 
-func runTaskProcessor(redisOpt asynq.RedisClientOpt, store db.Store) {
-	taskProcessor := worker.NewRedisTaskProcessor(redisOpt, store)
+func runTaskProcessor(config util.Env, redisOpt asynq.RedisClientOpt, store db.Store) {
+	mailer := mail.NewGmailSender(config.EmailSenderName, config.EmailSenderAddress, config.EmailSenderPassword)
+
+	taskProcessor := worker.NewRedisTaskProcessor(redisOpt, store, mailer)
 	log.Println("Starting task processor")
 	err := taskProcessor.Start()
 	if err != nil {

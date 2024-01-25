@@ -26,7 +26,7 @@ func createRandomUser(t *testing.T) User {
 		Email:          util.RandomEmail(),
 	}
 
-	user, err := testQueries.CreateUser(context.Background(), arg)
+	user, err := testStore.CreateUser(context.Background(), arg)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, user)
 
@@ -47,7 +47,7 @@ func TestListUser(t *testing.T) {
 		Offset: 5,
 	}
 
-	expectedUsers, err := testQueries.ListUsers(context.Background(), arg)
+	expectedUsers, err := testStore.ListUsers(context.Background(), arg)
 	assert.NoError(t, err)
 	assert.Len(t, expectedUsers, 5)
 

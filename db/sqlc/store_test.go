@@ -2,18 +2,15 @@ package db
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
 func TestTransferTx(t *testing.T) {
-	store := NewStore(testDB)
 
 	testAccount1 := createRandomAccount(t)
 	testAccount2 := createRandomAccount(t)
-	fmt.Println(">> before ", testAccount1.Balance, testAccount2.Balance)
 
 	// run n concurrent transactions
 	n := 5
@@ -24,7 +21,7 @@ func TestTransferTx(t *testing.T) {
 
 	for i := 0; i < n; i++ {
 		go func() {
-			result, err := store.TransferTx(context.Background(), TransferTxParams{
+			result, err := testStore.TransferTx(context.Background(), TransferTxParams{
 				FromAccountID: testAccount1.ID,
 				ToAccountID:   testAccount2.ID,
 				Amount:        amount,
@@ -55,7 +52,7 @@ func TestTransferTx(t *testing.T) {
 		assert.NotZero(t, transfer.ID)
 		assert.NotZero(t, transfer.CreatedAt)
 
-		_, err = store.GetTransfer(context.Background(), transfer.ID)
+		_, err = testStore.GetTransfer(context.Background(), transfer.ID)
 		assert.NoError(t, err)
 
 		// check entries
@@ -66,7 +63,7 @@ func TestTransferTx(t *testing.T) {
 		assert.NotZero(t, fromEntry.ID)
 		assert.NotZero(t, fromEntry.CreatedAt)
 
-		_, err = store.GetEntry(context.Background(), fromEntry.ID)
+		_, err = testStore.GetEntry(context.Background(), fromEntry.ID)
 		assert.NoError(t, err)
 
 		toEntry := result.ToEntry
@@ -76,7 +73,7 @@ func TestTransferTx(t *testing.T) {
 		assert.NotZero(t, toEntry.ID)
 		assert.NotZero(t, toEntry.CreatedAt)
 
-		_, err = store.GetEntry(context.Background(), toEntry.ID)
+		_, err = testStore.GetEntry(context.Background(), toEntry.ID)
 		assert.NoError(t, err)
 
 		// check accounts
@@ -89,7 +86,6 @@ func TestTransferTx(t *testing.T) {
 		assert.Equal(t, testAccount2.ID, toAccount.ID)
 
 		// check account balance
-		fmt.Println(">> tx ", fromAccount.Balance, toAccount.Balance)
 		diff1 := testAccount1.Balance - fromAccount.Balance
 		diff2 := toAccount.Balance - testAccount2.Balance
 		assert.Equal(t, diff1, diff2)
@@ -103,24 +99,20 @@ func TestTransferTx(t *testing.T) {
 	}
 
 	// check final updated balances
-	updateAccount1, err := testQueries.GetAccount(context.Background(), testAccount1.ID)
+	updateAccount1, err := testStore.GetAccount(context.Background(), testAccount1.ID)
 	assert.NoError(t, err)
 
-	updateAccount2, err := testQueries.GetAccount(context.Background(), testAccount2.ID)
+	updateAccount2, err := testStore.GetAccount(context.Background(), testAccount2.ID)
 	assert.NoError(t, err)
 
-	fmt.Println(">> after ", updateAccount1.Balance, updateAccount2.Balance)
 	assert.Equal(t, testAccount1.Balance-int64(n)*amount, updateAccount1.Balance)
 	assert.Equal(t, testAccount2.Balance+int64(n)*amount, updateAccount2.Balance)
 
 }
 
 func TestTransferTxDeadlock(t *testing.T) {
-	store := NewStore(testDB)
-
 	testAccount1 := createRandomAccount(t)
 	testAccount2 := createRandomAccount(t)
-	fmt.Println(">> before ", testAccount1.Balance, testAccount2.Balance)
 
 	// run n concurrent transactions
 	n := 10
@@ -137,7 +129,7 @@ func TestTransferTxDeadlock(t *testing.T) {
 		}
 
 		go func() {
-			_, err := store.TransferTx(context.Background(), TransferTxParams{
+			_, err := testStore.TransferTx(context.Background(), TransferTxParams{
 				FromAccountID: fromAccountID,
 				ToAccountID:   toAccountID,
 				Amount:        amount,
@@ -153,13 +145,11 @@ func TestTransferTxDeadlock(t *testing.T) {
 	}
 
 	// check final updated balances
-	updateAccount1, err := testQueries.GetAccount(context.Background(), testAccount1.ID)
+	updateAccount1, err := testStore.GetAccount(context.Background(), testAccount1.ID)
 	assert.NoError(t, err)
 
-	updateAccount2, err := testQueries.GetAccount(context.Background(), testAccount2.ID)
+	updateAccount2, err := testStore.GetAccount(context.Background(), testAccount2.ID)
 	assert.NoError(t, err)
-
-	fmt.Println(">> after: ", updateAccount1.Balance, updateAccount2.Balance)
 
 	assert.Equal(t, testAccount1.Balance, updateAccount1.Balance)
 	assert.Equal(t, testAccount2.Balance, updateAccount2.Balance)

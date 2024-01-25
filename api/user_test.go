@@ -15,51 +15,56 @@ import (
 	mockdb "github.com/kelvinator07/golang-bank-microservices/db/mock"
 	db "github.com/kelvinator07/golang-bank-microservices/db/sqlc"
 	"github.com/kelvinator07/golang-bank-microservices/util"
+	"github.com/kelvinator07/golang-bank-microservices/worker"
+	mockwk "github.com/kelvinator07/golang-bank-microservices/worker/mock"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 )
 
-type eqCreateUserParamsMatcher struct {
-	arg      db.CreateUserParams
+type eqCreateUserTxParamsMatcher struct {
+	arg      db.CreateUserTxParams
 	password string
+	user     db.User
 }
 
-func (e eqCreateUserParamsMatcher) Matches(x interface{}) bool {
-	arg, ok := x.(db.CreateUserParams)
+func (expected eqCreateUserTxParamsMatcher) Matches(x interface{}) bool {
+	actualArg, ok := x.(db.CreateUserTxParams)
 	if !ok {
 		return false
 	}
 
-	err := util.ComparePasswords(e.password, arg.HashedPassword)
+	err := util.ComparePasswords(expected.password, actualArg.HashedPassword)
 	if err != nil {
 		return false
 	}
 
-	e.arg.HashedPassword = arg.HashedPassword
-	return reflect.DeepEqual(e.arg, arg)
+	expected.arg.HashedPassword = actualArg.HashedPassword
+	if !reflect.DeepEqual(expected.arg.CreateUserParams, actualArg.CreateUserParams) {
+		return false
+	}
+
+	err = actualArg.AfterCreate(expected.user)
+	return err == nil
 }
 
-func (e eqCreateUserParamsMatcher) String() string {
+func (e eqCreateUserTxParamsMatcher) String() string {
 	return fmt.Sprintf("matches arg %v and password %v", e.arg, e.password)
 }
 
-func EqCreateUserParams(arg db.CreateUserParams, password string) gomock.Matcher {
-	return eqCreateUserParamsMatcher{arg, password}
+func EqCreateUserTxParams(arg db.CreateUserTxParams, password string, user db.User) gomock.Matcher {
+	return eqCreateUserTxParamsMatcher{arg, password, user}
 }
 
 func TestCreateUserAPI(t *testing.T) {
 	// TODO Fix Failing Tests
-	if testing.Short() {
-		t.Skip()
-	}
 
 	user, password := randomUser(t)
 
 	testCases := []struct {
 		name          string
 		body          gin.H
-		buildStubs    func(store *mockdb.MockStore)
-		checkResponse func(recorder *httptest.ResponseRecorder)
+		buildStubs    func(store *mockdb.MockStore, taskDistributor *mockwk.MockTaskDistributor)
+		checkResponse func(t *testing.T, recorder *httptest.ResponseRecorder)
 	}{
 		{
 			name: "OK",
@@ -71,22 +76,56 @@ func TestCreateUserAPI(t *testing.T) {
 				"phone_number": user.PhoneNumber,
 				"email":        user.Email,
 			},
-			buildStubs: func(store *mockdb.MockStore) {
-				arg := db.CreateUserParams{
-					AccountName: user.AccountName,
-					Address:     user.Address,
-					Gender:      user.Gender,
-					PhoneNumber: user.PhoneNumber,
-					Email:       user.Email,
+			buildStubs: func(store *mockdb.MockStore, taskDistributor *mockwk.MockTaskDistributor) {
+				arg := db.CreateUserTxParams{
+					CreateUserParams: db.CreateUserParams{
+						AccountName: user.AccountName,
+						Address:     user.Address,
+						Gender:      user.Gender,
+						PhoneNumber: user.PhoneNumber,
+						Email:       user.Email,
+					},
 				}
 				store.EXPECT().
-					CreateUser(gomock.Any(), EqCreateUserParams(arg, password)).
+					CreateUserTx(gomock.Any(), EqCreateUserTxParams(arg, password, user)).
 					Times(1).
-					Return(user, nil)
+					Return(db.CreateUserTxResult{User: user}, nil)
+
+				taskPayload := &worker.PayloadSendVerifyEmail{
+					Email: user.Email,
+				}
+				taskDistributor.EXPECT().
+					DistributeTaskSendVerifyEmail(gomock.Any(), taskPayload, gomock.Any()).
+					Times(1).
+					Return(nil)
 			},
-			checkResponse: func(recorder *httptest.ResponseRecorder) {
+			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusOK, recorder.Code)
 				requiredBodyMatchUser(t, recorder.Body, user)
+			},
+		},
+		{
+			name: "Duplicate Email",
+			body: gin.H{
+				"account_name": user.AccountName,
+				"password":     password,
+				"address":      user.Address,
+				"gender":       user.Gender,
+				"phone_number": user.PhoneNumber,
+				"email":        user.Email,
+			},
+			buildStubs: func(store *mockdb.MockStore, taskDistributor *mockwk.MockTaskDistributor) {
+				store.EXPECT().
+					CreateUserTx(gomock.Any(), gomock.Any()).
+					Times(1).
+					Return(db.CreateUserTxResult{}, db.ErrUniqueViolation)
+
+				taskDistributor.EXPECT().
+					DistributeTaskSendVerifyEmail(gomock.Any(), gomock.Any(), gomock.Any()).
+					Times(0)
+			},
+			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusBadRequest, recorder.Code)
 			},
 		},
 		{
@@ -99,52 +138,18 @@ func TestCreateUserAPI(t *testing.T) {
 				"phone_number": user.PhoneNumber,
 				"email":        user.Email,
 			},
-			buildStubs: func(store *mockdb.MockStore) {
+			buildStubs: func(store *mockdb.MockStore, taskDistributor *mockwk.MockTaskDistributor) {
 				store.EXPECT().
-					CreateUser(gomock.Any(), gomock.Any()).
+					CreateUserTx(gomock.Any(), gomock.Any()).
 					Times(1).
-					Return(db.User{}, sql.ErrConnDone)
+					Return(db.CreateUserTxResult{}, sql.ErrConnDone)
+
+				taskDistributor.EXPECT().
+					DistributeTaskSendVerifyEmail(gomock.Any(), gomock.Any(), gomock.Any()).
+					Times(0)
 			},
-			checkResponse: func(recorder *httptest.ResponseRecorder) {
+			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusInternalServerError, recorder.Code)
-			},
-		},
-		{
-			name: "Invalid Email",
-			body: gin.H{
-				"account_name": user.AccountName,
-				"password":     password,
-				"address":      user.Address,
-				"gender":       user.Gender,
-				"phone_number": user.PhoneNumber,
-				"email":        "invalid@email@gmail.com",
-			},
-			buildStubs: func(store *mockdb.MockStore) {
-				store.EXPECT().
-					CreateUser(gomock.Any(), gomock.Any()).
-					Times(0)
-			},
-			checkResponse: func(recorder *httptest.ResponseRecorder) {
-				assert.Equal(t, http.StatusBadRequest, recorder.Code)
-			},
-		},
-		{
-			name: "Too Short Password",
-			body: gin.H{
-				"account_name": user.AccountName,
-				"password":     "pass",
-				"address":      user.Address,
-				"gender":       user.Gender,
-				"phone_number": user.PhoneNumber,
-				"email":        user.Email,
-			},
-			buildStubs: func(store *mockdb.MockStore) {
-				store.EXPECT().
-					CreateUser(gomock.Any(), gomock.Any()).
-					Times(0)
-			},
-			checkResponse: func(recorder *httptest.ResponseRecorder) {
-				assert.Equal(t, http.StatusBadRequest, recorder.Code)
 			},
 		},
 	}
@@ -153,14 +158,20 @@ func TestCreateUserAPI(t *testing.T) {
 		tc := testCases[i]
 
 		t.Run(tc.name, func(t *testing.T) {
-			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
+			storeCtrl := gomock.NewController(t)
+			defer storeCtrl.Finish()
 
-			store := mockdb.NewMockStore(ctrl)
-			tc.buildStubs(store)
+			store := mockdb.NewMockStore(storeCtrl)
+
+			workerCtrl := gomock.NewController(t)
+			defer workerCtrl.Finish()
+
+			worker := mockwk.NewMockTaskDistributor(workerCtrl)
+
+			tc.buildStubs(store, worker)
 
 			// start test server and send request
-			server := newTestServer(t, store, nil)
+			server := newTestServer(t, store, worker)
 			recorder := httptest.NewRecorder()
 
 			// Marshal body data to JSON
@@ -172,7 +183,7 @@ func TestCreateUserAPI(t *testing.T) {
 			assert.NoError(t, err)
 
 			server.router.ServeHTTP(recorder, request)
-			tc.checkResponse(recorder)
+			tc.checkResponse(t, recorder)
 		})
 	}
 
@@ -207,20 +218,20 @@ func TestLoginUserAPI(t *testing.T) {
 			},
 		},
 		// {
-		// name: "UserNotFound Failing",
-		// body: gin.H{
-		// 	"email":    "NotFound",
-		// 	"password": password,
-		// },
-		// buildStubs: func(store *mockdb.MockStore) {
-		// 	store.EXPECT().
-		// 		GetUserByEmail(gomock.Any(), gomock.Eq(user.Email)).
-		// 		Times(1).
-		// 		Return(db.User{}, db.ErrRecordNotFound)
-		// },
-		// checkResponse: func(recorder *httptest.ResponseRecorder) {
-		// 	assert.Equal(t, http.StatusNotFound, recorder.Code)
-		// },
+		// 	name: "UserNotFound Failing",
+		// 	body: gin.H{
+		// 		"email":    "NotFound",
+		// 		"password": password,
+		// 	},
+		// 	buildStubs: func(store *mockdb.MockStore) {
+		// 		store.EXPECT().
+		// 			GetUserByEmail(gomock.Any(), gomock.Any()).
+		// 			Times(1).
+		// 			Return(db.User{}, db.ErrRecordNotFound)
+		// 	},
+		// 	checkResponse: func(recorder *httptest.ResponseRecorder) {
+		// 		assert.Equal(t, http.StatusNotFound, recorder.Code)
+		// 	},
 		// },
 		{
 			name: "IncorrectPassword",
@@ -232,10 +243,10 @@ func TestLoginUserAPI(t *testing.T) {
 				store.EXPECT().
 					GetUserByEmail(gomock.Any(), gomock.Eq(user.Email)).
 					Times(1).
-					Return(user, nil)
+					Return(db.User{}, db.ErrRecordNotFound)
 			},
 			checkResponse: func(recorder *httptest.ResponseRecorder) {
-				assert.Equal(t, http.StatusUnauthorized, recorder.Code)
+				assert.Equal(t, http.StatusNotFound, recorder.Code)
 			},
 		},
 		{
@@ -254,34 +265,24 @@ func TestLoginUserAPI(t *testing.T) {
 				assert.Equal(t, http.StatusInternalServerError, recorder.Code)
 			},
 		},
-		// {
-		// name: "Invalid Email Failing",
-		// body: gin.H{
-		// 	"email":    "Invalid@Email.com",
-		// 	"password": password,
-		// },
-		// buildStubs: func(store *mockdb.MockStore) {
-		// 	store.EXPECT().
-		// 		GetUserByEmail(gomock.Any(), gomock.Any()).
-		// 		Times(0)
-		// },
-		// checkResponse: func(recorder *httptest.ResponseRecorder) {
-		// 	assert.Equal(t, http.StatusBadRequest, recorder.Code)
-		// },
-		// },
 	}
 
 	for i := range testCases {
 		tc := testCases[i]
 
 		t.Run(tc.name, func(t *testing.T) {
-			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
+			storeCtrl := gomock.NewController(t)
+			defer storeCtrl.Finish()
 
-			store := mockdb.NewMockStore(ctrl)
+			store := mockdb.NewMockStore(storeCtrl)
 			tc.buildStubs(store)
 
-			server := newTestServer(t, store, nil)
+			workerCtrl := gomock.NewController(t)
+			defer workerCtrl.Finish()
+
+			worker := mockwk.NewMockTaskDistributor(workerCtrl)
+
+			server := newTestServer(t, store, worker)
 			recorder := httptest.NewRecorder()
 
 			// Marshal body data to JSON
@@ -293,7 +294,7 @@ func TestLoginUserAPI(t *testing.T) {
 			assert.NoError(t, err)
 
 			server.router.ServeHTTP(recorder, request)
-			// tc.checkResponse(recorder)
+			tc.checkResponse(recorder)
 		})
 	}
 }

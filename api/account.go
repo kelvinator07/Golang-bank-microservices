@@ -1,7 +1,6 @@
 package api
 
 import (
-	"database/sql"
 	"errors"
 	"fmt"
 	"net/http"
@@ -40,6 +39,11 @@ func (server *Server) createAccount(ctx *gin.Context) {
 
 	account, err := server.store.CreateAccount(ctx, arg)
 	if err != nil {
+		errCode := db.ErrorCode(err)
+		if errCode == db.UniqueViolation || errCode == db.ForeignKeyViolation {
+			ctx.JSON(http.StatusBadRequest, errorResponse(err))
+			return
+		}
 		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
 		return
 	}
@@ -60,7 +64,7 @@ func (server *Server) getAccount(ctx *gin.Context) {
 
 	account, err := server.store.GetAccount(ctx, req.ID)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, db.ErrRecordNotFound) {
 			err = fmt.Errorf("account with id %v doesnt exist", req.ID)
 			ctx.JSON(http.StatusNotFound, errorResponse(err))
 			return

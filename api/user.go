@@ -1,7 +1,6 @@
 package api
 
 import (
-	"database/sql"
 	"errors"
 	"fmt"
 	"net/http"
@@ -15,7 +14,6 @@ import (
 	"github.com/kelvinator07/golang-bank-microservices/token"
 	"github.com/kelvinator07/golang-bank-microservices/util"
 	"github.com/kelvinator07/golang-bank-microservices/worker"
-	"github.com/lib/pq"
 )
 
 type createUserRequest struct {
@@ -56,6 +54,11 @@ func (server *Server) createUser(ctx *gin.Context) {
 		return
 	}
 
+	// violations := validateCreateUserRequest(req)
+	// if violations != nil {
+	// 	return nil, invalidArgumentError(violations)
+	// }
+
 	// hash password
 	hashedPassword, err := util.HashPassword(req.Password)
 	if err != nil {
@@ -63,47 +66,60 @@ func (server *Server) createUser(ctx *gin.Context) {
 		return
 	}
 
-	arg := db.CreateUserParams{
-		AccountName:    req.AccountName,
-		HashedPassword: hashedPassword,
-		Address:        req.Address,
-		Gender:         req.Gender,
-		PhoneNumber:    req.PhoneNumber,
-		Email:          req.Email,
+	arg := db.CreateUserTxParams{
+		CreateUserParams: db.CreateUserParams{
+			AccountName:    req.AccountName,
+			HashedPassword: hashedPassword,
+			Address:        req.Address,
+			Gender:         req.Gender,
+			PhoneNumber:    req.PhoneNumber,
+			Email:          req.Email,
+		},
+		AfterCreate: func(user db.User) error {
+			taskPayload := &worker.PayloadSendVerifyEmail{Email: user.Email}
+
+			opts := []asynq.Option{
+				asynq.MaxRetry(10),
+				asynq.ProcessIn(10 * time.Second),
+				asynq.Queue(worker.QueueCritical),
+			}
+			// User should be created, while task periodically checks the very email table to send emails
+			return server.taskDistributor.DistributeTaskSendVerifyEmail(ctx, taskPayload, opts...)
+		},
 	}
 
-	user, err := server.store.CreateUser(ctx, arg)
+	txResult, err := server.store.CreateUserTx(ctx, arg)
 	if err != nil {
-		if pqErr, ok := err.(*pq.Error); ok {
-			switch pqErr.Code.Name() {
-			case "unique_violation":
-				ctx.JSON(http.StatusForbidden, errorResponse(err))
-				return
-			}
+		if db.ErrorCode(err) == db.UniqueViolation {
+			ctx.JSON(http.StatusBadRequest, errorResponse(err))
+			return
 		}
 		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
 		return
 	}
 
-	// send verification email
-	// TODO use db transaction
-	taskPayload := &worker.PayloadSendVerifyEmail{Email: user.Email}
-
-	opts := []asynq.Option{
-		asynq.MaxRetry(10),
-		asynq.ProcessIn(10 * time.Second),
-		asynq.Queue(worker.QueueCritical),
-	}
-
-	err = server.taskDistributor.DistributeTaskSendVerifyEmail(ctx, taskPayload, opts...)
-	if err != nil {
-		err = fmt.Errorf("failed to distribute task to send verify email")
-		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
-		return
-	}
-
-	ctx.JSON(http.StatusOK, NewValidHttpResponse(newUserResponse(user)))
+	ctx.JSON(http.StatusOK, NewValidHttpResponse(newUserResponse(txResult.User)))
 }
+
+// func validateCreateUserRequest(req *createUserRequest) (violations []*errdetails.BadRequest_FieldViolation) {
+// if err := val.ValidateUsername(req.AccountName); err != nil {
+// 	violations = append(violations, fieldViolation("username", err))
+// }
+
+// if err := val.ValidatePassword(req.AccountName); err != nil {
+// 	violations = append(violations, fieldViolation("password", err))
+// }
+
+// if err := val.ValidateFullName(req.AccountName); err != nil {
+// 	violations = append(violations, fieldViolation("full_name", err))
+// }
+
+// if err := val.ValidateEmail(req.Email); err != nil {
+// 	violations = append(violations, fieldViolation("email", err))
+// }
+
+// 	return violations
+// }
 
 type loginUserRequest struct {
 	Email    string `json:"email" binding:"required,email"`
@@ -128,7 +144,7 @@ func (server *Server) loginUser(ctx *gin.Context) {
 
 	user, err := server.store.GetUserByEmail(ctx, req.Email)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, db.ErrRecordNotFound) {
 			err = fmt.Errorf("user with email %s doesn't exist", req.Email)
 			ctx.JSON(http.StatusNotFound, errorResponse(err))
 			return
@@ -196,7 +212,7 @@ func (server *Server) getOneUser(ctx *gin.Context) {
 
 	user, err := server.store.GetUser(ctx, req.ID)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, db.ErrRecordNotFound) {
 			err = fmt.Errorf("user with id %v doesn't exist", req.ID)
 			ctx.JSON(http.StatusNotFound, errorResponse(err))
 			return
@@ -341,7 +357,7 @@ func (server *Server) verifyEmail(ctx *gin.Context) {
 		SecretCode: req.SecretCode,
 	})
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, db.ErrRecordNotFound) {
 			err = fmt.Errorf("verify email with id %v doesn't exist", req.EmailId)
 			ctx.JSON(http.StatusBadRequest, errorResponse(err))
 			return

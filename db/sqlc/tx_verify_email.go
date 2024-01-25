@@ -2,9 +2,10 @@ package db
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"time"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type VerifyEmailTxParams struct {
@@ -25,7 +26,7 @@ func (store *SQLStore) VerifyEmailTx(ctx context.Context, arg VerifyEmailTxParam
 
 		result.VerifyEmail, err = q.GetVerifyEmail(ctx, arg.EmailId)
 		if err != nil {
-			if err == sql.ErrNoRows {
+			if err == ErrRecordNotFound {
 				err = fmt.Errorf("verify email with id %v doesn't exist", arg.EmailId)
 				return err
 			}
@@ -53,11 +54,11 @@ func (store *SQLStore) VerifyEmailTx(ctx context.Context, arg VerifyEmailTxParam
 		}
 
 		result.User, err = q.UpdateUser(ctx, UpdateUserParams{
-			Email: sql.NullString{
+			Email: pgtype.Text{
 				String: result.VerifyEmail.Email,
 				Valid:  true,
 			},
-			IsEmailVerified: sql.NullBool{
+			IsEmailVerified: pgtype.Bool{
 				Bool:  true,
 				Valid: true,
 			},

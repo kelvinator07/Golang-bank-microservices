@@ -2,7 +2,6 @@ package db
 
 import (
 	"context"
-	"database/sql"
 	"testing"
 	"time"
 
@@ -22,7 +21,7 @@ func createRandomAccount(t *testing.T) Account {
 		CurrencyCode:  util.RandomCurrency(),
 	}
 
-	account, err := testQueries.CreateAccount(context.Background(), arg)
+	account, err := testStore.CreateAccount(context.Background(), arg)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, account)
 	assert.Equal(t, arg.Balance, account.Balance)
@@ -40,7 +39,7 @@ func TestCreateAccount(t *testing.T) {
 
 func TestGetAccount(t *testing.T) {
 	testAccount := createRandomAccount(t)
-	expectedAccount, err := testQueries.GetAccount(context.Background(), testAccount.ID)
+	expectedAccount, err := testStore.GetAccount(context.Background(), testAccount.ID)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, expectedAccount)
 
@@ -58,7 +57,7 @@ func TestUpdateAccount(t *testing.T) {
 		Balance: util.RandomMoney(),
 	}
 
-	expectedAccount, err := testQueries.UpdateAccount(context.Background(), arg)
+	expectedAccount, err := testStore.UpdateAccount(context.Background(), arg)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, expectedAccount)
 
@@ -70,12 +69,12 @@ func TestUpdateAccount(t *testing.T) {
 
 func TestDeleteAccount(t *testing.T) {
 	testAccount := createRandomAccount(t)
-	err := testQueries.DeleteAccount(context.Background(), testAccount.ID)
+	err := testStore.DeleteAccount(context.Background(), testAccount.ID)
 	assert.NoError(t, err)
 
-	expectedAccount, err := testQueries.GetAccount(context.Background(), testAccount.ID)
+	expectedAccount, err := testStore.GetAccount(context.Background(), testAccount.ID)
 	assert.Error(t, err)
-	assert.EqualError(t, err, sql.ErrNoRows.Error())
+	assert.EqualError(t, err, ErrRecordNotFound.Error())
 	assert.Empty(t, expectedAccount)
 }
 
@@ -90,7 +89,7 @@ func TestListAccount(t *testing.T) {
 		Offset: 0,
 	}
 
-	expectedAccounts, err := testQueries.ListAccounts(context.Background(), arg)
+	expectedAccounts, err := testStore.ListAccounts(context.Background(), arg)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, expectedAccounts)
 

@@ -9,7 +9,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/kelvinator07/golang-bank-microservices/token"
+	mockwk "github.com/kelvinator07/golang-bank-microservices/worker/mock"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/mock/gomock"
 )
 
 func addAuthorization(
@@ -86,8 +88,13 @@ func TestAuthMiddleware(t *testing.T) {
 		tc := testCases[i]
 
 		t.Run(tc.name, func(t *testing.T) {
+			workerCtrl := gomock.NewController(t)
+			defer workerCtrl.Finish()
+
+			worker := mockwk.NewMockTaskDistributor(workerCtrl)
+
 			// start test server and send request
-			server := newTestServer(t, nil, nil)
+			server := newTestServer(t, nil, worker)
 
 			authUrl := "/api/v1/auth"
 			server.router.GET(

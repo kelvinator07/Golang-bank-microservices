@@ -15,9 +15,12 @@ import (
 	db "github.com/kelvinator07/golang-bank-microservices/db/sqlc"
 	"github.com/kelvinator07/golang-bank-microservices/token"
 	"github.com/kelvinator07/golang-bank-microservices/util"
+	mockwk "github.com/kelvinator07/golang-bank-microservices/worker/mock"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 )
+
+// TODO TEST CREATE ACCOUNT
 
 func TestGetAccountAPI(t *testing.T) {
 	user, _ := randomUser(t)
@@ -57,7 +60,7 @@ func TestGetAccountAPI(t *testing.T) {
 				store.EXPECT().
 					GetAccount(gomock.Any(), gomock.Eq(account.ID)).
 					Times(1).
-					Return(db.Account{}, sql.ErrNoRows)
+					Return(db.Account{}, db.ErrRecordNotFound)
 			},
 			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusNotFound, recorder.Code)
@@ -130,14 +133,19 @@ func TestGetAccountAPI(t *testing.T) {
 		tc := testCases[i]
 
 		t.Run(tc.name, func(t *testing.T) {
-			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
+			storeCtrl := gomock.NewController(t)
+			defer storeCtrl.Finish()
 
-			store := mockdb.NewMockStore(ctrl)
+			store := mockdb.NewMockStore(storeCtrl)
 			tc.buildStubs(store)
 
+			workerCtrl := gomock.NewController(t)
+			defer workerCtrl.Finish()
+
+			worker := mockwk.NewMockTaskDistributor(workerCtrl)
+
 			// start test server and send request
-			server := newTestServer(t, store, nil)
+			server := newTestServer(t, store, worker)
 			recorder := httptest.NewRecorder()
 
 			url := fmt.Sprintf("/api/v1/accounts/%d", tc.accountID)
@@ -277,13 +285,18 @@ func TestGetAllAccountsAPI(t *testing.T) {
 		tc := testCases[i]
 
 		t.Run(tc.name, func(t *testing.T) {
-			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
+			storeCtrl := gomock.NewController(t)
+			defer storeCtrl.Finish()
 
-			store := mockdb.NewMockStore(ctrl)
+			store := mockdb.NewMockStore(storeCtrl)
 			tc.buildStubs(store)
 
-			server := newTestServer(t, store, nil)
+			workerCtrl := gomock.NewController(t)
+			defer workerCtrl.Finish()
+
+			worker := mockwk.NewMockTaskDistributor(workerCtrl)
+
+			server := newTestServer(t, store, worker)
 			recorder := httptest.NewRecorder()
 
 			url := "/api/v1/accounts"

@@ -9,7 +9,6 @@ import (
 	db "github.com/kelvinator07/golang-bank-microservices/db/sqlc"
 	"github.com/kelvinator07/golang-bank-microservices/util"
 	"github.com/kelvinator07/golang-bank-microservices/worker"
-	_ "github.com/lib/pq"
 	"github.com/stretchr/testify/require"
 )
 

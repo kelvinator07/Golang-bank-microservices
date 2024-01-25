@@ -2,8 +2,8 @@ package worker
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"log"
@@ -49,7 +49,7 @@ func (processor *RedisTaskProcessor) ProcessTaskSendVerifyEmail(ctx context.Cont
 
 	user, err := processor.store.GetUserByEmail(ctx, payload.Email)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, db.ErrRecordNotFound) {
 			return fmt.Errorf("user with email %v doesnt exist", payload.Email)
 		}
 		return fmt.Errorf("failed to get user %w", err)
@@ -65,7 +65,7 @@ func (processor *RedisTaskProcessor) ProcessTaskSendVerifyEmail(ctx context.Cont
 
 	// Send Email to user
 	subject := "Welcome to Golang Bank"
-	verifyUrl := fmt.Sprintf("http://localhost:8080/verify-email?email_id=%d&secret_code=%s", verifyEmail.ID, verifyEmail.SecretCode)
+	verifyUrl := fmt.Sprintf("http://localhost:8080/api/v1/verify-email?email_id=%d&secret_code=%s", verifyEmail.ID, verifyEmail.SecretCode)
 	content := fmt.Sprintf(`Hello %s, <br/>
 	Thank you for registering with us! <br/>
 	Please <a href="%s">click here</a> to verify your email adddress.<br/>

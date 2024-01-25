@@ -1,12 +1,13 @@
 package api
 
 import (
-	"database/sql"
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	db "github.com/kelvinator07/golang-bank-microservices/db/sqlc"
 )
 
 type renewAccessTokenRequest struct {
@@ -33,7 +34,7 @@ func (server *Server) renewAccessToken(ctx *gin.Context) {
 
 	sesssion, err := server.store.GetSession(ctx, refreshPayload.ID)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, db.ErrRecordNotFound) {
 			ctx.JSON(http.StatusNotFound, errorResponse(err))
 			return
 		}
@@ -67,7 +68,7 @@ func (server *Server) renewAccessToken(ctx *gin.Context) {
 
 	user, err := server.store.GetUserByEmail(ctx, refreshPayload.Email)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, db.ErrRecordNotFound) {
 			err = fmt.Errorf("user with email %s doesn't exist", refreshPayload.Email)
 			ctx.JSON(http.StatusNotFound, errorResponse(err))
 			return

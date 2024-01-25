@@ -7,7 +7,8 @@ package db
 
 import (
 	"context"
-	"database/sql"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createUser = `-- name: CreateUser :one
@@ -33,7 +34,7 @@ type CreateUserParams struct {
 }
 
 func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
-	row := q.db.QueryRowContext(ctx, createUser,
+	row := q.db.QueryRow(ctx, createUser,
 		arg.AccountName,
 		arg.HashedPassword,
 		arg.Address,
@@ -63,7 +64,7 @@ WHERE id = $1
 `
 
 func (q *Queries) DeleteUser(ctx context.Context, id int64) error {
-	_, err := q.db.ExecContext(ctx, deleteUser, id)
+	_, err := q.db.Exec(ctx, deleteUser, id)
 	return err
 }
 
@@ -80,7 +81,7 @@ type GetAllUsersParams struct {
 }
 
 func (q *Queries) GetAllUsers(ctx context.Context, arg GetAllUsersParams) ([]User, error) {
-	rows, err := q.db.QueryContext(ctx, getAllUsers, arg.ID, arg.Limit)
+	rows, err := q.db.Query(ctx, getAllUsers, arg.ID, arg.Limit)
 	if err != nil {
 		return nil, err
 	}
@@ -104,9 +105,6 @@ func (q *Queries) GetAllUsers(ctx context.Context, arg GetAllUsersParams) ([]Use
 		}
 		items = append(items, i)
 	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -119,7 +117,7 @@ WHERE id = $1 LIMIT 1
 `
 
 func (q *Queries) GetUser(ctx context.Context, id int64) (User, error) {
-	row := q.db.QueryRowContext(ctx, getUser, id)
+	row := q.db.QueryRow(ctx, getUser, id)
 	var i User
 	err := row.Scan(
 		&i.ID,
@@ -142,7 +140,7 @@ WHERE email = $1 LIMIT 1
 `
 
 func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error) {
-	row := q.db.QueryRowContext(ctx, getUserByEmail, email)
+	row := q.db.QueryRow(ctx, getUserByEmail, email)
 	var i User
 	err := row.Scan(
 		&i.ID,
@@ -166,7 +164,7 @@ FOR NO KEY UPDATE
 `
 
 func (q *Queries) GetUserForUpdate(ctx context.Context, id int64) (User, error) {
-	row := q.db.QueryRowContext(ctx, getUserForUpdate, id)
+	row := q.db.QueryRow(ctx, getUserForUpdate, id)
 	var i User
 	err := row.Scan(
 		&i.ID,
@@ -196,7 +194,7 @@ type ListUsersParams struct {
 }
 
 func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]User, error) {
-	rows, err := q.db.QueryContext(ctx, listUsers, arg.Limit, arg.Offset)
+	rows, err := q.db.Query(ctx, listUsers, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
 	}
@@ -220,9 +218,6 @@ func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]User, e
 		}
 		items = append(items, i)
 	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -245,17 +240,17 @@ RETURNING id, account_name, hashed_password, address, gender, phone_number, emai
 `
 
 type UpdateUserParams struct {
-	AccountName       sql.NullString `json:"account_name"`
-	HashedPassword    sql.NullString `json:"hashed_password"`
-	PasswordChangedAt sql.NullTime   `json:"password_changed_at"`
-	Address           sql.NullString `json:"address"`
-	PhoneNumber       sql.NullInt64  `json:"phone_number"`
-	Email             sql.NullString `json:"email"`
-	IsEmailVerified   sql.NullBool   `json:"is_email_verified"`
+	AccountName       pgtype.Text        `json:"account_name"`
+	HashedPassword    pgtype.Text        `json:"hashed_password"`
+	PasswordChangedAt pgtype.Timestamptz `json:"password_changed_at"`
+	Address           pgtype.Text        `json:"address"`
+	PhoneNumber       pgtype.Int8        `json:"phone_number"`
+	Email             pgtype.Text        `json:"email"`
+	IsEmailVerified   pgtype.Bool        `json:"is_email_verified"`
 }
 
 func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (User, error) {
-	row := q.db.QueryRowContext(ctx, updateUser,
+	row := q.db.QueryRow(ctx, updateUser,
 		arg.AccountName,
 		arg.HashedPassword,
 		arg.PasswordChangedAt,

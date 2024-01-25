@@ -44,6 +44,7 @@ start-docker:
 
 mockgen:
 	mockgen -package mockdb -destination db/mock/store.go github.com/kelvinator07/golang-bank-microservices/db/sqlc Store
+	mockgen -package mockwk -destination worker/mock/distributor.go github.com/kelvinator07/golang-bank-microservices/worker TaskDistributor
 
 redis:
 	docker run --name redis -p 6379:6379 -d redis:7-alpine
